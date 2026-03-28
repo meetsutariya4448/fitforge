@@ -21,9 +21,9 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 1440
 
-    # ── Anthropic ────────────────────────────────────────────────
-    anthropic_api_key: str = ""
-    claude_model: str = "claude-sonnet-4-6"
+    # ── Groq ─────────────────────────────────────────────────────
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.3-70b-versatile"
 
     model_config = SettingsConfigDict(
         env_file=".env",

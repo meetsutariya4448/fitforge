@@ -1,10 +1,10 @@
 """
-Claude API service for AI workout plan generation.
+Groq API service for AI workout plan generation.
 
 Responsible for:
   1. Building a structured prompt from onboarding data
-  2. Calling the Anthropic Claude API
-  3. Parsing Claude's JSON response into WorkoutPlan schema objects
+  2. Calling the Groq API (OpenAI-compatible chat completions)
+  3. Parsing the JSON response into WorkoutPlan schema objects
 
 Separation of concerns: the router calls this service; the service owns
 all AI-specific logic so it can be swapped or tested independently.
@@ -12,7 +12,7 @@ all AI-specific logic so it can be swapped or tested independently.
 
 import json
 import logging
-from anthropic import Anthropic, APIError
+from groq import Groq, APIError
 
 from app.config import settings
 from app.schemas.workout import OnboardingData, WorkoutPlan, WorkoutDay, Exercise
@@ -20,14 +20,14 @@ from app.schemas.workout import OnboardingData, WorkoutPlan, WorkoutDay, Exercis
 logger = logging.getLogger(__name__)
 
 # Lazily initialised so the app can start even without an API key set
-_client: Anthropic | None = None
+_client: Groq | None = None
 
 
-def _get_client() -> Anthropic:
-    """Return (or create) the shared Anthropic client."""
+def _get_client() -> Groq:
+    """Return (or create) the shared Groq client."""
     global _client
     if _client is None:
-        _client = Anthropic(api_key=settings.anthropic_api_key)
+        _client = Groq(api_key=settings.groq_api_key)
     return _client
 
 
@@ -99,11 +99,11 @@ Make sure exercises are appropriate for {level_str} level and use ONLY the liste
 
 async def generate_workout_plan(data: OnboardingData) -> WorkoutPlan:
     """
-    Call Claude to generate a workout plan from onboarding data.
+    Call Groq to generate a workout plan from onboarding data.
 
     Raises:
-        ValueError: if Claude returns malformed JSON or missing fields
-        APIError: if the Anthropic API call fails
+        ValueError: if the model returns malformed JSON or missing fields
+        APIError: if the Groq API call fails
     """
     client = _get_client()
 
@@ -113,19 +113,21 @@ async def generate_workout_plan(data: OnboardingData) -> WorkoutPlan:
     )
 
     try:
-        message = client.messages.create(
-            model=settings.claude_model,
+        completion = client.chat.completions.create(
+            model=settings.groq_model,
             max_tokens=4096,
-            system=_build_system_prompt(),
-            messages=[{"role": "user", "content": _build_user_prompt(data)}],
+            messages=[
+                {"role": "system", "content": _build_system_prompt()},
+                {"role": "user", "content": _build_user_prompt(data)},
+            ],
         )
     except APIError as exc:
-        logger.error("Anthropic API error: %s", exc)
+        logger.error("Groq API error: %s", exc)
         raise
 
-    raw_text = message.content[0].text.strip()
+    raw_text = completion.choices[0].message.content.strip()
 
-    # Strip markdown fences if Claude adds them despite instructions
+    # Strip markdown fences if the model adds them despite instructions
     if raw_text.startswith("```"):
         raw_text = raw_text.split("```")[1]
         if raw_text.startswith("json"):
@@ -135,15 +137,15 @@ async def generate_workout_plan(data: OnboardingData) -> WorkoutPlan:
     try:
         plan_dict = json.loads(raw_text)
     except json.JSONDecodeError as exc:
-        logger.error("Claude returned non-JSON response: %s", raw_text[:500])
-        raise ValueError(f"Could not parse Claude's response as JSON: {exc}") from exc
+        logger.error("Groq returned non-JSON response: %s", raw_text[:500])
+        raise ValueError(f"Could not parse Groq's response as JSON: {exc}") from exc
 
     # Validate and coerce into our Pydantic schema
     try:
         plan = WorkoutPlan(**plan_dict)
     except Exception as exc:
-        logger.error("Claude JSON did not match WorkoutPlan schema: %s", exc)
-        raise ValueError(f"Claude response schema mismatch: {exc}") from exc
+        logger.error("Groq JSON did not match WorkoutPlan schema: %s", exc)
+        raise ValueError(f"Groq response schema mismatch: {exc}") from exc
 
     logger.info("Successfully generated plan: %s", plan.title)
     return plan
