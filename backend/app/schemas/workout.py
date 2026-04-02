@@ -7,6 +7,8 @@ WorkoutDay      → one day's worth of exercises
 WorkoutPlan     → the full weekly plan returned to the frontend
 """
 
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from enum import Enum
@@ -98,3 +100,27 @@ class WorkoutPlanResponse(BaseModel):
     """API response wrapper around WorkoutPlan."""
     success: bool = True
     plan: WorkoutPlan
+
+
+# ── History schemas ───────────────────────────────────────────────────────────
+
+class WorkoutPlanHistoryItem(BaseModel):
+    """
+    A single entry in the user's plan history.
+    Returned by GET /api/workout/history — includes the full plan_json so
+    the frontend can render any past plan without calling the AI again.
+    """
+    id: int
+    goal: str
+    fitness_level: str
+    days_per_week: int
+    created_at: datetime
+    plan_json: dict
+
+    model_config = {"from_attributes": True}
+
+
+class WorkoutHistoryResponse(BaseModel):
+    """Response for the history endpoint — ordered newest-first."""
+    plans: List[WorkoutPlanHistoryItem]
+    total: int
