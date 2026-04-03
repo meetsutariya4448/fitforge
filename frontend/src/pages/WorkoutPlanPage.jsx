@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useEffect } from 'react'
-import { Dumbbell, ArrowLeft, RefreshCw } from 'lucide-react'
+import { Dumbbell, ArrowLeft, RefreshCw, LayoutList } from 'lucide-react'
 import { motion } from 'framer-motion'
 import WorkoutPlan from '../components/workout/WorkoutPlan'
 import Button from '../components/ui/Button'
@@ -37,6 +37,10 @@ export default function WorkoutPlanPage() {
             <Button variant="ghost" size="sm" onClick={() => navigate('/onboarding')}>
               <RefreshCw className="w-4 h-4 mr-1.5" />
               Regenerate
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/plans')}>
+              <LayoutList className="w-4 h-4 mr-1.5" />
+              My Plans
             </Button>
             <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
               <ArrowLeft className="w-4 h-4 mr-1.5" />

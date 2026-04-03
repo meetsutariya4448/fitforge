@@ -51,6 +51,17 @@ export const generateWorkoutPlan = async (onboardingData) => {
   return data
 }
 
+/**
+ * Fetch the authenticated user's saved workout plan history.
+ * Requires a valid JWT in localStorage (attached automatically by the interceptor).
+ *
+ * @returns {Promise<{plans: Array, total: number}>}
+ */
+export const getWorkoutHistory = async () => {
+  const { data } = await apiClient.get('/api/workout/history')
+  return data
+}
+
 // ── Auth endpoints (stubs for Module 2) ──────────────────────────────────────
 
 export const register = async (payload) => {
