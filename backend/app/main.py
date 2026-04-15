@@ -45,11 +45,24 @@ app = FastAPI(
 )
 
 # ── CORS ─────────────────────────────────────────────────────────────────────
-# Allow requests from the React dev server (and production frontend URL).
+# Explicit origin list is required when allow_credentials=True.
+# The CORS spec forbids wildcard origins (e.g. "https://*.vercel.app") combined
+# with credentials — browsers will block such responses. Every trusted origin
+# must be listed as an exact string.
+ALLOWED_ORIGINS = [
+    # Local development
+    "http://localhost:5173",
+    "http://localhost:3000",
+    # Production frontend on Vercel
+    "https://fitforge-frontend.vercel.app",
+    # settings.frontend_url covers any additional URL set via .env
+    settings.frontend_url,
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url],
-    allow_credentials=True,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,   # required for Authorization: Bearer header
     allow_methods=["*"],
     allow_headers=["*"],
 )
