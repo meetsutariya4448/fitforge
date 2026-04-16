@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Dumbbell } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -13,6 +13,13 @@ export default function Onboarding() {
   const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
+
+  // Auth guard — unauthenticated users must log in before generating a plan
+  useEffect(() => {
+    if (!localStorage.getItem('fitforge_token')) {
+      navigate('/auth', { replace: true })
+    }
+  }, [navigate])
 
   /**
    * Called by OnboardingForm when all steps are completed.

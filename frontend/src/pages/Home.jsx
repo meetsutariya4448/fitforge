@@ -41,7 +41,7 @@ export default function Home() {
               <LayoutList className="w-4 h-4 mr-1.5" />
               My Plans
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/onboarding')}>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>
               Get Started
             </Button>
           </div>
@@ -74,7 +74,7 @@ export default function Home() {
 
           <Button
             size="lg"
-            onClick={() => navigate('/onboarding')}
+            onClick={() => navigate('/auth')}
             className="group"
           >
             Build My Plan
