@@ -31,8 +31,8 @@ _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(plain_password: str) -> str:
-    """Return a bcrypt hash of the given plain-text password."""
-    return _pwd_context.hash(plain_password)
+    truncated = plain_password[:72]
+    return _pwd_context.hash(truncated)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
