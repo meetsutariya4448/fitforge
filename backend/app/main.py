@@ -45,18 +45,10 @@ app = FastAPI(
 )
 
 # ── CORS ─────────────────────────────────────────────────────────────────────
-# allow_origin_regex matches all Vercel preview URLs automatically so no
-# code change is needed when new preview deployments are created.
-# Localhost origins are listed explicitly for local development.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "https://fitforge-six.vercel.app",
-    ],
-    allow_origin_regex=r"https://.*\.vercel\.app",
-    allow_credentials=True,   # required for Authorization: Bearer header
+    allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
