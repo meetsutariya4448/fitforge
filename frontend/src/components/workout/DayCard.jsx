@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, Clock, Dumbbell } from 'lucide-react'
+import { ChevronDown, ChevronUp, Clock, Dumbbell, ClipboardList } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Button from '../ui/Button'
 
 /**
  * Collapsible card for a single workout day.
@@ -8,11 +9,12 @@ import { motion, AnimatePresence } from 'framer-motion'
  * Shows day title and focus when collapsed; expands to reveal
  * all exercises, warmup/cooldown notes.
  *
- * @param {Object}  day           - WorkoutDay object from the API
- * @param {boolean} defaultOpen   - Whether to start expanded
- * @param {number}  index         - Used for staggered entrance animation
+ * @param {Object}   day         - WorkoutDay object from the API
+ * @param {boolean}  defaultOpen - Whether to start expanded
+ * @param {number}   index       - Used for staggered entrance animation
+ * @param {Function} onLogDay    - Optional callback; if provided renders "Log This Workout" button
  */
-export default function DayCard({ day, defaultOpen = false, index = 0 }) {
+export default function DayCard({ day, defaultOpen = false, index = 0, onLogDay }) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
 
   return (
@@ -101,6 +103,16 @@ export default function DayCard({ day, defaultOpen = false, index = 0 }) {
                   <Dumbbell className="w-3.5 h-3.5" /> {day.exercises.length} exercises
                 </span>
               </div>
+
+              {/* Log This Workout — only shown when parent provides the callback */}
+              {onLogDay && (
+                <div className="mt-5 pt-4 border-t border-gray-800">
+                  <Button size="sm" variant="ghost" onClick={() => onLogDay(day)} className="w-full">
+                    <ClipboardList className="w-4 h-4 mr-2" />
+                    Log This Workout
+                  </Button>
+                </div>
+              )}
             </div>
           </motion.div>
         )}

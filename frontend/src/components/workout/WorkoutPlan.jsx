@@ -10,9 +10,10 @@ import DayCard from './DayCard'
  *   3. Collapsible DayCard per training day (first day open by default)
  *   4. General tips section
  *
- * @param {Object} plan - WorkoutPlan object from the API
+ * @param {Object}   plan      - WorkoutPlan object from the API
+ * @param {Function} onLogDay  - Optional; passed down to each DayCard for logging
  */
-export default function WorkoutPlan({ plan }) {
+export default function WorkoutPlan({ plan, onLogDay }) {
   return (
     <div className="animate-fade-in">
       {/* ── Header ── */}
@@ -40,6 +41,7 @@ export default function WorkoutPlan({ plan }) {
             day={day}
             index={index}
             defaultOpen={index === 0}  // First day starts expanded
+            onLogDay={onLogDay}
           />
         ))}
       </section>

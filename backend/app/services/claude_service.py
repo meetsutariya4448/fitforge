@@ -42,7 +42,7 @@ def _build_system_prompt() -> str:
     )
 
 
-def _build_user_prompt(data: OnboardingData) -> str:
+def _build_user_prompt(data: OnboardingData, session_history: str = None) -> str:
     equipment_str = ", ".join(e.value.replace("_", " ") for e in data.available_equipment)
     goal_str = data.fitness_goal.value.replace("_", " ")
     level_str = data.fitness_level.value
@@ -57,6 +57,7 @@ Create a personalised {data.days_per_week}-day weekly workout plan for:
 - Available equipment: {equipment_str}
 - Training days per week: {data.days_per_week}
 {"- Additional notes: " + data.additional_notes if data.additional_notes else ""}
+{"- User's recent training data: " + session_history + ". Based on this, adjust exercise selection and difficulty accordingly." if session_history else ""}
 
 Return ONLY a JSON object with this exact structure (no extra keys, no markdown):
 
@@ -97,7 +98,7 @@ Make sure exercises are appropriate for {level_str} level and use ONLY the liste
 
 # ── Main generation function ───────────────────────────────────────────────────
 
-async def generate_workout_plan(data: OnboardingData) -> WorkoutPlan:
+async def generate_workout_plan(data: OnboardingData, session_history: str = None) -> WorkoutPlan:
     """
     Call Groq to generate a workout plan from onboarding data.
 
@@ -118,7 +119,7 @@ async def generate_workout_plan(data: OnboardingData) -> WorkoutPlan:
             max_tokens=4096,
             messages=[
                 {"role": "system", "content": _build_system_prompt()},
-                {"role": "user", "content": _build_user_prompt(data)},
+                {"role": "user", "content": _build_user_prompt(data, session_history)},
             ],
         )
     except APIError as exc:

@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import engine, Base
-from app.routers import workout, auth
+from app.routers import workout, auth, sessions
 
 # Import all models so Base.metadata is populated before create_all()
 import app.models  # noqa: F401
@@ -64,6 +64,7 @@ app.add_middleware(
 # ── Routers ──────────────────────────────────────────────────────────────────
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(workout.router, prefix="/api/workout", tags=["Workout"])
+app.include_router(sessions.router, prefix="/api", tags=["Sessions"])
 
 
 # ── Health check ─────────────────────────────────────────────────────────────

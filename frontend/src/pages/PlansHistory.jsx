@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Dumbbell, Calendar, Target, BarChart2, Clock, ArrowRight, Plus } from 'lucide-react'
+import { Dumbbell, Calendar, Target, BarChart2, Clock, ArrowRight, Plus, TrendingUp } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Button from '../components/ui/Button'
 import { getWorkoutHistory } from '../services/api'
@@ -180,10 +180,16 @@ export default function PlansHistory() {
             <Dumbbell className="w-5 h-5 text-brand-500" />
             <span className="text-lg font-bold text-white">FitForge</span>
           </div>
-          <Button size="sm" onClick={() => navigate('/onboarding')}>
-            <Plus className="w-4 h-4 mr-1.5" />
-            New Plan
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')}>
+              <TrendingUp className="w-4 h-4 mr-1.5" />
+              Dashboard
+            </Button>
+            <Button size="sm" onClick={() => navigate('/onboarding')}>
+              <Plus className="w-4 h-4 mr-1.5" />
+              New Plan
+            </Button>
+          </div>
         </div>
       </nav>
 

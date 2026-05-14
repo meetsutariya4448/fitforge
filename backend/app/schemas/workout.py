@@ -61,6 +61,10 @@ class OnboardingData(BaseModel):
         max_length=500,
         description="Any injuries, preferences, or extra context"
     )
+    session_history: Optional[str] = Field(
+        default=None,
+        description="Summary of recent training sessions for context-aware plan generation"
+    )
 
 
 # ── Response schemas ──────────────────────────────────────────────────────────
@@ -124,3 +128,48 @@ class WorkoutHistoryResponse(BaseModel):
     """Response for the history endpoint — ordered newest-first."""
     plans: List[WorkoutPlanHistoryItem]
     total: int
+
+
+# ── Session schemas ───────────────────────────────────────────────────────────
+
+class ExerciseLogCreate(BaseModel):
+    """One exercise entry submitted when logging a session."""
+    exercise_name: str
+    sets_completed: int
+    reps_completed: int
+    weight_kg: Optional[float] = None
+
+
+class SessionCreate(BaseModel):
+    """Payload for POST /api/sessions — creates a new workout session."""
+    day_name: str
+    plan_id: Optional[int] = None
+    notes: Optional[str] = None
+    exercise_logs: List[ExerciseLogCreate]
+
+
+class ExerciseLogResponse(BaseModel):
+    """One exercise entry returned from the API."""
+    id: int
+    exercise_name: str
+    sets_completed: int
+    reps_completed: int
+    weight_kg: Optional[float]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SessionResponse(BaseModel):
+    """A full workout session with all its exercise logs."""
+    id: int
+    day_name: str
+    plan_id: Optional[int]
+    notes: Optional[str]
+    session_date: datetime
+    created_at: datetime
+    exercise_logs: List[ExerciseLogResponse]
+
+    class Config:
+        from_attributes = True

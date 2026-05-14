@@ -4,16 +4,8 @@ import Auth from './pages/Auth'
 import Onboarding from './pages/Onboarding'
 import WorkoutPlanPage from './pages/WorkoutPlanPage'
 import PlansHistory from './pages/PlansHistory'
+import Dashboard from './pages/Dashboard'
 
-/**
- * Root component — defines all client-side routes.
- *
- * /             → Landing page
- * /auth         → Login / Register
- * /onboarding   → Multi-step onboarding form (requires auth)
- * /plan         → Generated workout plan display
- * /plans        → Saved plan history (requires auth)
- */
 export default function App() {
   return (
     <Routes>
@@ -22,6 +14,7 @@ export default function App() {
       <Route path="/onboarding" element={<Onboarding />} />
       <Route path="/plan" element={<WorkoutPlanPage />} />
       <Route path="/plans" element={<PlansHistory />} />
+      <Route path="/dashboard" element={<Dashboard />} />
     </Routes>
   )
 }

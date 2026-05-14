@@ -62,7 +62,28 @@ export const getWorkoutHistory = async () => {
   return data
 }
 
-// ── Auth endpoints (stubs for Module 2) ──────────────────────────────────────
+// ── Session endpoints ─────────────────────────────────────────────────────────
+
+/**
+ * Log a completed workout session.
+ * @param {Object} sessionData - Matches SessionCreate schema
+ * @returns {Promise<Object>} SessionResponse
+ */
+export const logWorkoutSession = async (sessionData) => {
+  const { data } = await apiClient.post('/api/sessions', sessionData)
+  return data
+}
+
+/**
+ * Fetch all logged workout sessions for the authenticated user.
+ * @returns {Promise<Array>} List of SessionResponse objects, newest first
+ */
+export const getWorkoutSessions = async () => {
+  const { data } = await apiClient.get('/api/sessions')
+  return data
+}
+
+// ── Auth endpoints ────────────────────────────────────────────────────────────
 
 export const register = async (payload) => {
   const { data } = await apiClient.post('/api/auth/register', payload)

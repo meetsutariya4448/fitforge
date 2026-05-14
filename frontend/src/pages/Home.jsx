@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Dumbbell, Brain, TrendingUp, Users, ArrowRight, Zap, LayoutList } from 'lucide-react'
+import { Dumbbell, Brain, TrendingUp, Users, ArrowRight, Zap, LayoutList, BarChart2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Button from '../components/ui/Button'
 
@@ -37,6 +37,10 @@ export default function Home() {
             <span className="text-xl font-bold text-white">FitForge</span>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')}>
+              <BarChart2 className="w-4 h-4 mr-1.5" />
+              Dashboard
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => navigate('/plans')}>
               <LayoutList className="w-4 h-4 mr-1.5" />
               My Plans

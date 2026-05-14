@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(source venv/bin/activate)",
-      "Bash(python -c \"from app.main import app; print\\(''OK — app imported cleanly''\\)\")"
+      "Bash(python -c \"from app.main import app; print\\(''OK — app imported cleanly''\\)\")",
+      "Bash(npm run *)"
     ]
   }
 }
