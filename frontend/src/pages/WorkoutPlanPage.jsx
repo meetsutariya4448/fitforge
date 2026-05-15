@@ -28,7 +28,7 @@ export default function WorkoutPlanPage() {
   // Guard: redirect if there's no plan to display
   useEffect(() => {
     if (!plan) {
-      navigate('/onboarding', { replace: true })
+      navigate('/plans', { replace: true })
     }
   }, [plan, navigate])
 
@@ -89,6 +89,7 @@ export default function WorkoutPlanPage() {
       </motion.main>
 
       <LogWorkoutModal
+        key={selectedDay?.day}
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         dayData={selectedDay}

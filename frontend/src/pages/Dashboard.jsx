@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Dumbbell, TrendingUp, LayoutList, Home, Zap,
-  Calendar, Flame, BarChart2, Activity, LogOut, LogIn,
+  Dumbbell, TrendingUp, LayoutList, Zap,
+  Calendar, Flame, Trophy, Activity,
+  LogOut, LogIn, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import {
@@ -16,6 +17,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
+  const [expandedSession, setExpandedSession] = useState(null)
   const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('fitforge_token'))
 
   const handleLogout = () => {
@@ -25,19 +27,21 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
+    if (!localStorage.getItem('fitforge_token')) {
+      navigate('/auth', { replace: true })
+      return
+    }
     getWorkoutSessions()
       .then((res) => setSessions(Array.isArray(res) ? res : []))
       .catch(() => setSessions([]))
       .finally(() => setLoading(false))
-  }, [])
+  }, [navigate])
 
   // ── Derived stats ──────────────────────────────────────────────────────────
 
-  const totalSessions = sessions.length
-
   const totalVolume = sessions.reduce((sum, s) =>
-    sum + s.exercise_logs.reduce((logSum, l) =>
-      logSum + l.sets_completed * l.reps_completed * (l.weight_kg || 0), 0), 0)
+    sum + s.exercise_logs.reduce((ls, l) =>
+      ls + l.sets_completed * l.reps_completed * (l.weight_kg || 0), 0), 0)
 
   const exerciseCounts = {}
   sessions.forEach((s) =>
@@ -50,7 +54,18 @@ export default function Dashboard() {
     .slice(0, 5)
     .map(([name, count]) => ({ name, count }))
 
-  // Volume over last 8 sessions (chronological)
+  const topExerciseName = topExercises[0]?.name ?? '—'
+
+  // Sessions this week
+  const now = new Date()
+  const thisMonday = new Date(now)
+  thisMonday.setDate(now.getDate() - ((now.getDay() + 6) % 7))
+  thisMonday.setHours(0, 0, 0, 0)
+  const sessionsThisWeek = sessions.filter(
+    (s) => new Date(s.session_date) >= thisMonday
+  ).length
+
+  // Volume over last 8 sessions (chronological order)
   const volumeData = [...sessions]
     .reverse()
     .slice(-8)
@@ -63,7 +78,7 @@ export default function Dashboard() {
       ),
     }))
 
-  // Weekly consistency — sessions per week for last 6 weeks
+  // Weekly consistency — sessions per week for last 8 weeks
   const weeklyMap = {}
   sessions.forEach((s) => {
     const d = new Date(s.session_date)
@@ -73,14 +88,14 @@ export default function Dashboard() {
     weeklyMap[key] = (weeklyMap[key] || 0) + 1
   })
   const weeklyData = Object.entries(weeklyMap)
-    .slice(-6)
+    .slice(-8)
     .map(([week, count]) => ({ week, count }))
 
   const stats = [
-    { label: 'Total Sessions', value: totalSessions, icon: <Calendar className="w-5 h-5" />, color: 'text-brand-400' },
+    { label: 'Total Sessions', value: sessions.length, icon: <Calendar className="w-5 h-5" />, color: 'text-brand-400' },
     { label: 'Total Volume (kg)', value: Math.round(totalVolume).toLocaleString(), icon: <Flame className="w-5 h-5" />, color: 'text-orange-400' },
-    { label: 'Exercises Tracked', value: Object.keys(exerciseCounts).length, icon: <BarChart2 className="w-5 h-5" />, color: 'text-purple-400' },
-    { label: 'This Week', value: weeklyData.at(-1)?.count ?? 0, icon: <Activity className="w-5 h-5" />, color: 'text-green-400' },
+    { label: 'Sessions This Week', value: sessionsThisWeek, icon: <Activity className="w-5 h-5" />, color: 'text-green-400' },
+    { label: 'Most Trained', value: topExerciseName, icon: <Trophy className="w-5 h-5" />, color: 'text-yellow-400', small: true },
   ]
 
   return (
@@ -88,18 +103,18 @@ export default function Dashboard() {
       {/* ── Navbar ── */}
       <nav className="border-b border-gray-800 px-6 py-4 sticky top-0 bg-gray-950/90 backdrop-blur-sm z-10">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
             <Dumbbell className="w-5 h-5 text-brand-500" />
             <span className="text-lg font-bold text-white">FitForge</span>
           </div>
           <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-brand-400 flex items-center gap-1.5 px-3 py-1.5">
+              <TrendingUp className="w-4 h-4" />
+              Dashboard
+            </span>
             <Button variant="ghost" size="sm" onClick={() => navigate('/plans')}>
               <LayoutList className="w-4 h-4 mr-1.5" />
               My Plans
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
-              <Home className="w-4 h-4 mr-1.5" />
-              Home
             </Button>
             {isLoggedIn ? (
               <Button variant="ghost" size="sm" onClick={handleLogout}>
@@ -140,7 +155,9 @@ export default function Dashboard() {
           {stats.map((stat) => (
             <div key={stat.label} className="card p-5">
               <div className={`mb-3 ${stat.color}`}>{stat.icon}</div>
-              <div className="text-2xl font-extrabold text-white">{loading ? '—' : stat.value}</div>
+              <div className={`font-extrabold text-white ${stat.small ? 'text-base truncate' : 'text-2xl'}`}>
+                {loading ? '—' : stat.value}
+              </div>
               <div className="text-xs text-gray-500 mt-1">{stat.label}</div>
             </div>
           ))}
@@ -160,14 +177,18 @@ export default function Dashboard() {
         ) : (
           <>
             {/* ── Volume over time ── */}
-            {volumeData.length > 0 && (
-              <motion.section
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.2 }}
-                className="card p-6"
-              >
-                <h2 className="font-semibold text-white mb-6">Volume Over Time (kg)</h2>
+            <motion.section
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.2 }}
+              className="card p-6"
+            >
+              <h2 className="font-semibold text-white mb-6">Volume Over Time (kg)</h2>
+              {volumeData.length < 2 ? (
+                <p className="text-gray-500 text-sm text-center py-8">
+                  Log at least 2 workouts to see volume trends.
+                </p>
+              ) : (
                 <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={volumeData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
@@ -181,8 +202,8 @@ export default function Dashboard() {
                     <Line type="monotone" dataKey="volume" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>
-              </motion.section>
-            )}
+              )}
+            </motion.section>
 
             {/* ── Weekly consistency ── */}
             {weeklyData.length > 0 && (
@@ -217,7 +238,7 @@ export default function Dashboard() {
                 transition={{ duration: 0.4, delay: 0.4 }}
                 className="card p-6"
               >
-                <h2 className="font-semibold text-white mb-6">Top Exercises</h2>
+                <h2 className="font-semibold text-white mb-6">Top 5 Exercises</h2>
                 <ResponsiveContainer width="100%" height={topExercises.length * 44 + 16}>
                   <BarChart
                     data={topExercises}
@@ -238,7 +259,7 @@ export default function Dashboard() {
               </motion.section>
             )}
 
-            {/* ── Recent sessions ── */}
+            {/* ── Recent sessions (expandable) ── */}
             <motion.section
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
@@ -249,24 +270,53 @@ export default function Dashboard() {
               </h2>
               <div className="space-y-3">
                 {sessions.slice(0, 5).map((s) => (
-                  <div key={s.id} className="card p-4 flex items-center justify-between">
-                    <div>
-                      <div className="font-semibold text-white text-sm">{s.day_name}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        {new Date(s.session_date).toLocaleDateString('en-US', {
-                          month: 'short', day: 'numeric', year: 'numeric',
-                        })}
-                        {' · '}
-                        {s.exercise_logs.length} exercises
+                  <div key={s.id} className="card overflow-hidden">
+                    <button
+                      onClick={() => setExpandedSession(expandedSession === s.id ? null : s.id)}
+                      className="w-full p-4 flex items-center justify-between hover:bg-gray-800/50 transition-colors"
+                    >
+                      <div className="text-left">
+                        <div className="font-semibold text-white text-sm">{s.day_name}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {new Date(s.session_date).toLocaleDateString('en-US', {
+                            month: 'short', day: 'numeric', year: 'numeric',
+                          })}
+                          {' · '}
+                          {s.exercise_logs.length} exercises
+                        </div>
                       </div>
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      {Math.round(
-                        s.exercise_logs.reduce(
-                          (sum, l) => sum + l.sets_completed * l.reps_completed * (l.weight_kg || 0), 0
-                        )
-                      ).toLocaleString()} kg
-                    </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-gray-400">
+                          {Math.round(
+                            s.exercise_logs.reduce(
+                              (sum, l) => sum + l.sets_completed * l.reps_completed * (l.weight_kg || 0), 0
+                            )
+                          ).toLocaleString()} kg
+                        </span>
+                        {expandedSession === s.id
+                          ? <ChevronUp className="w-4 h-4 text-gray-500" />
+                          : <ChevronDown className="w-4 h-4 text-gray-500" />
+                        }
+                      </div>
+                    </button>
+                    {expandedSession === s.id && (
+                      <div className="px-4 pb-4 pt-3 border-t border-gray-800 space-y-2">
+                        {s.exercise_logs.map((l, i) => (
+                          <div key={i} className="flex items-center justify-between text-xs py-1">
+                            <span className="text-gray-300">{l.exercise_name}</span>
+                            <span className="text-gray-500">
+                              {l.sets_completed}×{l.reps_completed}
+                              {l.weight_kg ? ` @ ${l.weight_kg}kg` : ''}
+                            </span>
+                          </div>
+                        ))}
+                        {s.notes && (
+                          <p className="text-xs text-gray-600 italic pt-1 border-t border-gray-800 mt-2">
+                            {s.notes}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -289,7 +339,7 @@ export default function Dashboard() {
           </div>
           <Button onClick={() => navigate('/onboarding')} className="flex-shrink-0">
             <Zap className="w-4 h-4 mr-2" />
-            Generate New Plan
+            Generate New Plan From Progress
           </Button>
         </motion.div>
       </main>

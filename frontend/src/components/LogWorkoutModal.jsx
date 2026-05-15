@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Button from './ui/Button'
@@ -14,18 +14,22 @@ import { logWorkoutSession } from '../services/api'
  * @param {number}   planId   - ID of the parent workout plan (may be null)
  */
 export default function LogWorkoutModal({ isOpen, onClose, dayData, planId }) {
-  // One entry per exercise: { sets_completed, reps_completed, weight_kg }
-  const [logs, setLogs] = useState(() =>
-    (dayData?.exercises || []).map((ex) => ({
+  const buildLogs = (exercises) =>
+    (exercises || []).map((ex) => ({
       exercise_name: ex.name,
       sets_completed: ex.sets ?? 3,
-      reps_completed: typeof ex.reps === 'number'
-        ? ex.reps
-        : parseInt(ex.reps, 10) || 10,
+      reps_completed: typeof ex.reps === 'number' ? ex.reps : parseInt(ex.reps, 10) || 10,
       weight_kg: '',
     }))
-  )
+
+  const [logs, setLogs] = useState(() => buildLogs(dayData?.exercises))
   const [notes, setNotes] = useState('')
+
+  // Reinitialize when the selected day changes (dayData is null on first render)
+  useEffect(() => {
+    setLogs(buildLogs(dayData?.exercises))
+    setNotes('')
+  }, [dayData])
   const [isSaving, setIsSaving] = useState(false)
   const [toast, setToast] = useState(null)   // { message, type }
 

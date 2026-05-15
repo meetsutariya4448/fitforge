@@ -157,7 +157,7 @@ export default function PlansHistory() {
     // Auth guard — redirect unauthenticated visitors before making any API call
     const token = localStorage.getItem('fitforge_token')
     if (!token) {
-      navigate('/', { replace: true })
+      navigate('/auth', { replace: true })
       return
     }
 
@@ -192,6 +192,10 @@ export default function PlansHistory() {
               <TrendingUp className="w-4 h-4 mr-1.5" />
               Dashboard
             </Button>
+            <span className="text-sm font-semibold text-brand-400 flex items-center gap-1.5 px-3 py-1.5">
+              <LayoutList className="w-4 h-4" />
+              My Plans
+            </span>
             <Button size="sm" onClick={() => navigate('/onboarding')}>
               <Plus className="w-4 h-4 mr-1.5" />
               New Plan

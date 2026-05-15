@@ -31,8 +31,10 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid — clear local storage
       localStorage.removeItem('fitforge_token')
+      if (window.location.pathname !== '/auth') {
+        window.location.href = '/auth'
+      }
     }
     return Promise.reject(error)
   },
