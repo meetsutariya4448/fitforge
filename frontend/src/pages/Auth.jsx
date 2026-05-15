@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Dumbbell } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Button from '../components/ui/Button'
-import { register, login } from '../services/api'
+import { register, login, getWorkoutHistory } from '../services/api'
 
 /**
  * Auth page — Login and Register in a single tabbed view.
@@ -56,7 +56,14 @@ export default function Auth() {
 
       // Save JWT — the Axios interceptor picks this up on every subsequent request
       localStorage.setItem('fitforge_token', response.access_token)
-      navigate('/onboarding')
+
+      if (tab === 'register') {
+        navigate('/onboarding')
+      } else {
+        // Returning user: send to plans if they have any, otherwise onboarding
+        const { total } = await getWorkoutHistory()
+        navigate(total > 0 ? '/plans' : '/onboarding')
+      }
     } catch (err) {
       const detail = err.response?.data?.detail
       // detail can be a string or a Pydantic validation array
