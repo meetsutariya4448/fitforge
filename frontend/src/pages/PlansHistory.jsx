@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Dumbbell, Calendar, Target, BarChart2, Clock, ArrowRight, Plus, TrendingUp } from 'lucide-react'
+import { Dumbbell, Calendar, Target, BarChart2, Clock, ArrowRight, Plus, TrendingUp, LogOut, LogIn } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Button from '../components/ui/Button'
 import { getWorkoutHistory } from '../services/api'
@@ -145,6 +145,13 @@ export default function PlansHistory() {
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('fitforge_token'))
+
+  const handleLogout = () => {
+    localStorage.removeItem('fitforge_token')
+    setIsLoggedIn(false)
+    navigate('/auth')
+  }
 
   useEffect(() => {
     // Auth guard — redirect unauthenticated visitors before making any API call
@@ -189,6 +196,17 @@ export default function PlansHistory() {
               <Plus className="w-4 h-4 mr-1.5" />
               New Plan
             </Button>
+            {isLoggedIn ? (
+              <Button variant="ghost" size="sm" onClick={handleLogout}>
+                <LogOut className="w-4 h-4 mr-1.5" />
+                Logout
+              </Button>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>
+                <LogIn className="w-4 h-4 mr-1.5" />
+                Login
+              </Button>
+            )}
           </div>
         </div>
       </nav>

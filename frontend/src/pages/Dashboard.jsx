@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Dumbbell, TrendingUp, LayoutList, Home, Zap,
-  Calendar, Flame, BarChart2, Activity,
+  Calendar, Flame, BarChart2, Activity, LogOut, LogIn,
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import {
@@ -16,10 +16,17 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('fitforge_token'))
+
+  const handleLogout = () => {
+    localStorage.removeItem('fitforge_token')
+    setIsLoggedIn(false)
+    navigate('/auth')
+  }
 
   useEffect(() => {
     getWorkoutSessions()
-      .then((res) => setSessions(res.data))
+      .then((res) => setSessions(Array.isArray(res) ? res : []))
       .catch(() => setSessions([]))
       .finally(() => setLoading(false))
   }, [])
@@ -94,6 +101,17 @@ export default function Dashboard() {
               <Home className="w-4 h-4 mr-1.5" />
               Home
             </Button>
+            {isLoggedIn ? (
+              <Button variant="ghost" size="sm" onClick={handleLogout}>
+                <LogOut className="w-4 h-4 mr-1.5" />
+                Logout
+              </Button>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>
+                <LogIn className="w-4 h-4 mr-1.5" />
+                Login
+              </Button>
+            )}
           </div>
         </div>
       </nav>

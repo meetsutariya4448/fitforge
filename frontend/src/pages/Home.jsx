@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Dumbbell, Brain, TrendingUp, Users, ArrowRight, Zap, LayoutList, BarChart2 } from 'lucide-react'
+import { Dumbbell, Brain, TrendingUp, Users, ArrowRight, Zap, LayoutList, BarChart2, LogOut, LogIn } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Button from '../components/ui/Button'
 
@@ -8,6 +9,13 @@ import Button from '../components/ui/Button'
  */
 export default function Home() {
   const navigate = useNavigate()
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('fitforge_token'))
+
+  const handleLogout = () => {
+    localStorage.removeItem('fitforge_token')
+    setIsLoggedIn(false)
+    navigate('/auth')
+  }
 
   const features = [
     {
@@ -45,9 +53,17 @@ export default function Home() {
               <LayoutList className="w-4 h-4 mr-1.5" />
               My Plans
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>
-              Get Started
-            </Button>
+            {isLoggedIn ? (
+              <Button variant="ghost" size="sm" onClick={handleLogout}>
+                <LogOut className="w-4 h-4 mr-1.5" />
+                Logout
+              </Button>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>
+                <LogIn className="w-4 h-4 mr-1.5" />
+                Login
+              </Button>
+            )}
           </div>
         </div>
       </nav>

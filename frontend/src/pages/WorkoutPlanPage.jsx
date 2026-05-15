@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { Dumbbell, ArrowLeft, RefreshCw, LayoutList, TrendingUp } from 'lucide-react'
+import { Dumbbell, ArrowLeft, RefreshCw, LayoutList, TrendingUp, LogOut, LogIn } from 'lucide-react'
 import { motion } from 'framer-motion'
 import WorkoutPlan from '../components/workout/WorkoutPlan'
 import Button from '../components/ui/Button'
@@ -17,6 +17,13 @@ export default function WorkoutPlanPage() {
   const plan = location.state?.plan
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedDay, setSelectedDay] = useState(null)
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('fitforge_token'))
+
+  const handleLogout = () => {
+    localStorage.removeItem('fitforge_token')
+    setIsLoggedIn(false)
+    navigate('/auth')
+  }
 
   // Guard: redirect if there's no plan to display
   useEffect(() => {
@@ -53,6 +60,17 @@ export default function WorkoutPlanPage() {
               <ArrowLeft className="w-4 h-4 mr-1.5" />
               Home
             </Button>
+            {isLoggedIn ? (
+              <Button variant="ghost" size="sm" onClick={handleLogout}>
+                <LogOut className="w-4 h-4 mr-1.5" />
+                Logout
+              </Button>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>
+                <LogIn className="w-4 h-4 mr-1.5" />
+                Login
+              </Button>
+            )}
           </div>
         </div>
       </nav>
