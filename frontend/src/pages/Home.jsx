@@ -78,7 +78,7 @@ export default function Home() {
         >
           <div className="inline-flex items-center gap-2 bg-brand-500/10 text-brand-400 text-sm font-medium px-4 py-1.5 rounded-full mb-8 border border-brand-500/20">
             <Zap className="w-4 h-4" />
-            Powered by Claude AI
+            Powered by Groq AI
           </div>
 
           <h1 className="text-5xl sm:text-6xl font-extrabold text-white leading-tight mb-6">

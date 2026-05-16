@@ -7,7 +7,7 @@ ExerciseLog    — one exercise entry within a session (sets/reps/weight)
 Relationship: WorkoutSession has many ExerciseLogs (cascade delete).
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Column, Integer, String, Float, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
@@ -34,7 +34,7 @@ class WorkoutSession(Base):
     plan_id = Column(Integer, ForeignKey("workout_plans.id"), nullable=True)
 
     # When the workout actually took place
-    session_date = Column(DateTime, default=datetime.utcnow, nullable=False)
+    session_date = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # Which day of the plan was performed, e.g. "Day 1", "Upper Body"
     day_name = Column(String, nullable=False)
@@ -42,7 +42,7 @@ class WorkoutSession(Base):
     # Free-form notes about the session
     notes = Column(Text, nullable=True)
 
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # One session has many exercise log entries
     exercise_logs = relationship(
@@ -80,7 +80,7 @@ class ExerciseLog(Base):
     reps_completed = Column(Integer, nullable=False)
     weight_kg = Column(Float, nullable=True)   # null = bodyweight exercise
 
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     session = relationship("WorkoutSession", back_populates="exercise_logs")
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Dumbbell, Calendar, Target, BarChart2, Clock, ArrowRight, Plus, TrendingUp, LogOut, LogIn } from 'lucide-react'
+import { Dumbbell, Calendar, Target, BarChart2, Clock, ArrowRight, Plus, TrendingUp, LogOut, LogIn, LayoutList } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Button from '../components/ui/Button'
 import { getWorkoutHistory } from '../services/api'
