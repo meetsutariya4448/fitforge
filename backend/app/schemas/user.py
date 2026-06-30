@@ -4,7 +4,6 @@ These are the request/response models — not SQLAlchemy ORM models.
 """
 
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
 
 
 class UserRegister(BaseModel):

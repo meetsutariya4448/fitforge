@@ -15,7 +15,7 @@ import logging
 from groq import Groq, APIError
 
 from app.config import settings
-from app.schemas.workout import OnboardingData, WorkoutPlan, WorkoutDay, Exercise
+from app.schemas.workout import OnboardingData, WorkoutPlan
 
 logger = logging.getLogger(__name__)
 

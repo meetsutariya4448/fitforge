@@ -1,0 +1,35 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# AI tools
+.claude/
+.cursor/
+.history/
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+.next/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Misc
+*.tmp
+*.swp

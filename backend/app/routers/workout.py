@@ -4,7 +4,6 @@ Workout router.
 POST /api/workout/generate
   Generates a personalised workout plan via Groq AI, saves it to the
   database linked to the authenticated user, and returns the plan.
-  Response shape is unchanged from the unauthenticated version.
 
 GET /api/workout/history
   Returns all saved workout plans for the authenticated user,
@@ -25,7 +24,7 @@ from app.schemas.workout import (
     WorkoutHistoryResponse,
     WorkoutPlanHistoryItem,
 )
-from app.services.claude_service import generate_workout_plan
+from app.services.ai_service import generate_workout_plan
 from app.services.auth_service import get_current_user
 
 router = APIRouter()

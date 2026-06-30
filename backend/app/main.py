@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
 # ── App instance ─────────────────────────────────────────────────────────────
 app = FastAPI(
     title="FitForge API",
-    description="AI-powered fitness platform — workout plans, progress tracking, social features.",
+    description="AI-powered fitness platform — workout plans, progress tracking, personal records.",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",

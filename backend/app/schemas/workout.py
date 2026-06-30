@@ -90,7 +90,7 @@ class WorkoutDay(BaseModel):
 
 class WorkoutPlan(BaseModel):
     """
-    The complete weekly workout plan returned after Claude generation.
+    The complete weekly workout plan returned after AI generation.
     Structured so the frontend can render collapsible day cards.
     """
     title: str                       # e.g. "4-Day Intermediate Muscle Building Plan"

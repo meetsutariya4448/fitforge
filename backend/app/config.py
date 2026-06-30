@@ -11,7 +11,6 @@ class Settings(BaseSettings):
     app_name: str = "FitForge"
     app_env: str = "development"
     app_port: int = 8000
-    frontend_url: str = "http://localhost:5173"
 
     # ── Database ─────────────────────────────────────────────────
     database_url: str = "postgresql://postgres:password@localhost:5432/fitforge"

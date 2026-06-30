@@ -192,16 +192,6 @@ fitforge/
 
 ---
 
-## Screenshots
-
-> _Add screenshots here_
-
-| Landing | Dashboard | Plan View |
-|---------|-----------|-----------|
-| _(screenshot)_ | _(screenshot)_ | _(screenshot)_ |
-
----
-
 ## License
 
 MIT — built by [Meet Sutariya](https://github.com/meetsutariya4448) as a portfolio project.
