@@ -11,18 +11,14 @@ import axios from 'axios'
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  timeout: 60_000,  // 60 s — AI generation can take a moment
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 60_000,
 })
 
 // ── Request interceptor: attach JWT if present ─────────────────────────────
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('fitforge_token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
+  if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
@@ -32,58 +28,12 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('fitforge_token')
-      if (window.location.pathname !== '/auth') {
-        window.location.href = '/auth'
-      }
+      localStorage.removeItem('fitforge_user')
+      if (window.location.pathname !== '/auth') window.location.href = '/auth'
     }
     return Promise.reject(error)
   },
 )
-
-// ── Workout endpoints ────────────────────────────────────────────────────────
-
-/**
- * Generate a personalised workout plan from onboarding data.
- *
- * @param {Object} onboardingData - Matches the OnboardingData Pydantic schema
- * @returns {Promise<{success: boolean, plan: Object}>}
- */
-export const generateWorkoutPlan = async (onboardingData) => {
-  const { data } = await apiClient.post('/api/workout/generate', onboardingData)
-  return data
-}
-
-/**
- * Fetch the authenticated user's saved workout plan history.
- * Requires a valid JWT in localStorage (attached automatically by the interceptor).
- *
- * @returns {Promise<{plans: Array, total: number}>}
- */
-export const getWorkoutHistory = async () => {
-  const { data } = await apiClient.get('/api/workout/history')
-  return data
-}
-
-// ── Session endpoints ─────────────────────────────────────────────────────────
-
-/**
- * Log a completed workout session.
- * @param {Object} sessionData - Matches SessionCreate schema
- * @returns {Promise<Object>} SessionResponse
- */
-export const logWorkoutSession = async (sessionData) => {
-  const { data } = await apiClient.post('/api/sessions', sessionData)
-  return data
-}
-
-/**
- * Fetch all logged workout sessions for the authenticated user.
- * @returns {Promise<Array>} List of SessionResponse objects, newest first
- */
-export const getWorkoutSessions = async () => {
-  const { data } = await apiClient.get('/api/sessions')
-  return data
-}
 
 // ── Auth endpoints ────────────────────────────────────────────────────────────
 
@@ -94,6 +44,52 @@ export const register = async (payload) => {
 
 export const login = async (payload) => {
   const { data } = await apiClient.post('/api/auth/login', payload)
+  return data
+}
+
+export const loginDemo = async () => {
+  const { data } = await apiClient.post('/api/auth/login', {
+    email: 'demo@fitforge.app',
+    password: 'Demo1234!',
+  })
+  return data
+}
+
+// ── Workout endpoints ────────────────────────────────────────────────────────
+
+export const generateWorkoutPlan = async (onboardingData) => {
+  const { data } = await apiClient.post('/api/workout/generate', onboardingData)
+  return data
+}
+
+export const getWorkoutHistory = async () => {
+  const { data } = await apiClient.get('/api/workout/history')
+  return data
+}
+
+// ── Session endpoints ─────────────────────────────────────────────────────────
+
+export const logWorkoutSession = async (sessionData) => {
+  const { data } = await apiClient.post('/api/sessions', sessionData)
+  return data
+}
+
+export const getWorkoutSessions = async () => {
+  const { data } = await apiClient.get('/api/sessions')
+  return data
+}
+
+export const getExerciseTrend = async (exerciseName) => {
+  const { data } = await apiClient.get(
+    `/api/sessions/exercise/${encodeURIComponent(exerciseName)}`
+  )
+  return data
+}
+
+// ── Personal Records endpoints ────────────────────────────────────────────────
+
+export const getPRs = async () => {
+  const { data } = await apiClient.get('/api/prs')
   return data
 }
 

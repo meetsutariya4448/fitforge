@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Dumbbell, Calendar, Target, BarChart2, Clock, ArrowRight, Plus, TrendingUp, LogOut, LogIn, LayoutList } from 'lucide-react'
+import { Dumbbell, Calendar, Target, BarChart2, Clock, ArrowRight, Plus } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Button from '../components/ui/Button'
+import Navbar from '../components/Navbar'
 import { getWorkoutHistory } from '../services/api'
 
 // ── Formatting helpers ────────────────────────────────────────────────────────
@@ -145,106 +146,50 @@ export default function PlansHistory() {
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('fitforge_token'))
-
-  const handleLogout = () => {
-    localStorage.removeItem('fitforge_token')
-    setIsLoggedIn(false)
-    navigate('/auth')
-  }
 
   useEffect(() => {
-    // Auth guard — redirect unauthenticated visitors before making any API call
+    document.title = 'FitForge — My Plans'
     const token = localStorage.getItem('fitforge_token')
-    if (!token) {
-      navigate('/auth', { replace: true })
-      return
-    }
+    if (!token) { navigate('/auth', { replace: true }); return }
 
     getWorkoutHistory()
-      .then(({ plans, total }) => {
-        setPlans(plans)
-        setTotal(total)
-      })
+      .then(({ plans, total }) => { setPlans(plans); setTotal(total) })
       .catch((err) => {
-        // 401 is handled globally (token cleared); other errors show a banner
-        if (err.response?.status !== 401) {
-          setError('Could not load your plans. Please try again.')
-        }
+        if (err.response?.status !== 401) setError('Could not load your plans. Please try again.')
       })
       .finally(() => setIsLoading(false))
   }, [navigate])
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
-      {/* ── Navbar ── */}
-      <nav className="border-b border-gray-800 px-6 py-4 sticky top-0 bg-gray-950/90 backdrop-blur-sm z-10">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div
-            className="flex items-center gap-2 cursor-pointer"
-            onClick={() => navigate('/')}
-          >
-            <Dumbbell className="w-5 h-5 text-brand-500" />
-            <span className="text-lg font-bold text-white">FitForge</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')}>
-              <TrendingUp className="w-4 h-4 mr-1.5" />
-              Dashboard
-            </Button>
-            <span className="text-sm font-semibold text-brand-400 flex items-center gap-1.5 px-3 py-1.5">
-              <LayoutList className="w-4 h-4" />
-              My Plans
-            </span>
-            <Button size="sm" onClick={() => navigate('/onboarding')}>
-              <Plus className="w-4 h-4 mr-1.5" />
-              New Plan
-            </Button>
-            {isLoggedIn ? (
-              <Button variant="ghost" size="sm" onClick={handleLogout}>
-                <LogOut className="w-4 h-4 mr-1.5" />
-                Logout
-              </Button>
-            ) : (
-              <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>
-                <LogIn className="w-4 h-4 mr-1.5" />
-                Login
-              </Button>
-            )}
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
-      {/* ── Page header ── */}
-      <div className="max-w-5xl mx-auto w-full px-6 pt-10 pb-6">
-        <h1 className="text-3xl font-extrabold text-white mb-1">My Plans</h1>
-        {!isLoading && total > 0 && (
-          <p className="text-gray-400 text-sm">
-            {total} plan{total !== 1 ? 's' : ''} generated
-          </p>
-        )}
+      <div className="max-w-5xl mx-auto w-full px-4 sm:px-6 pt-10 pb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white mb-1">My Plans</h1>
+          {!isLoading && total > 0 && (
+            <p className="text-gray-400 text-sm">{total} plan{total !== 1 ? 's' : ''} generated</p>
+          )}
+        </div>
+        <Button size="sm" onClick={() => navigate('/onboarding')}>
+          <Plus className="w-4 h-4 mr-1.5" /> New Plan
+        </Button>
       </div>
 
-      {/* ── Error banner ── */}
       {error && (
-        <div className="max-w-5xl mx-auto w-full px-6 mb-4">
-          <div className="bg-red-950/50 border border-red-800 text-red-300 rounded-xl px-4 py-3 text-sm">
-            {error}
-          </div>
+        <div className="max-w-5xl mx-auto w-full px-4 sm:px-6 mb-4">
+          <div className="bg-red-950/50 border border-red-800 text-red-300 rounded-xl px-4 py-3 text-sm">{error}</div>
         </div>
       )}
 
-      {/* ── Content ── */}
-      <div className="max-w-5xl mx-auto w-full px-6 pb-24 flex flex-col flex-1">
+      <div className="max-w-5xl mx-auto w-full px-4 sm:px-6 pb-24 flex flex-col flex-1">
         {isLoading ? (
           <LoadingState />
         ) : total === 0 ? (
           <EmptyState />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {plans.map((plan, index) => (
-              <PlanCard key={plan.id} plan={plan} index={index} />
-            ))}
+            {plans.map((plan, index) => <PlanCard key={plan.id} plan={plan} index={index} />)}
           </div>
         )}
       </div>

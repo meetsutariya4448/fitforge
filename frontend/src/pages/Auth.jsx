@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Dumbbell } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -13,6 +13,7 @@ import { register, login, getWorkoutHistory } from '../services/api'
  */
 export default function Auth() {
   const navigate = useNavigate()
+  useEffect(() => { document.title = 'FitForge — Sign In' }, [])
   const [tab, setTab] = useState('login')       // 'login' | 'register'
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -54,8 +55,11 @@ export default function Auth() {
         })
       }
 
-      // Save JWT — the Axios interceptor picks this up on every subsequent request
+      // Save JWT and user info so the Navbar can show the user's name
       localStorage.setItem('fitforge_token', response.access_token)
+      if (response.user) {
+        localStorage.setItem('fitforge_user', JSON.stringify(response.user))
+      }
 
       if (tab === 'register') {
         navigate('/onboarding')

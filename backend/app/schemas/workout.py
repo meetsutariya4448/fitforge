@@ -173,3 +173,32 @@ class SessionResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ── Personal Record schemas ───────────────────────────────────────────────────
+
+class PROut(BaseModel):
+    """One personal record entry returned from GET /api/prs."""
+    id: int
+    exercise_name: str
+    max_weight_kg: Optional[float]
+    max_reps: Optional[int]
+    achieved_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ── Exercise strength trend schemas ──────────────────────────────────────────
+
+class ExerciseTrendPoint(BaseModel):
+    """One data point in a per-exercise strength trend."""
+    date: datetime
+    max_weight_kg: Optional[float]
+    total_volume: float     # sets * reps * weight_kg for that log entry
+
+
+class ExerciseTrendResponse(BaseModel):
+    """Response for GET /api/sessions/exercise/{exercise_name}."""
+    exercise_name: str
+    data: List[ExerciseTrendPoint]

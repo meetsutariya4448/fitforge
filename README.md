@@ -1,8 +1,39 @@
-# FitForge
+# FitForge — AI Fitness Platform
 
-**FitForge** is a full-stack AI fitness platform that generates personalised weekly workout plans in seconds. Users answer five questions about their goals, fitness level, and available equipment, and the Groq-powered AI produces a structured, day-by-day training plan tailored to them. Plans are saved to a PostgreSQL database so users can revisit any past plan, log completed workouts with sets, reps, and weight, and track their progress through an interactive dashboard with charts.
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-fitforge--six.vercel.app-brand?style=flat-square&color=10b981)](https://fitforge-six.vercel.app)
+[![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react)](https://react.dev)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat-square&logo=postgresql)](https://www.postgresql.org)
+[![Groq AI](https://img.shields.io/badge/Groq-Llama%203.3%2070B-orange?style=flat-square)](https://groq.com)
+
+---
+
+## Overview
+
+FitForge is a full-stack AI fitness platform that generates personalised weekly workout plans in seconds. Users describe their goals, fitness level, and available equipment across a 5-step onboarding flow, then receive a structured, day-by-day plan produced by Groq's Llama 3.3 70B model. Every plan is saved to their account so they can revisit past plans, log completed workouts with sets, reps, and weight, and track progress through an interactive dashboard with strength trend charts and personal record tracking.
 
 🔗 **Live demo:** [https://fitforge-six.vercel.app](https://fitforge-six.vercel.app)
+🔑 **Demo login:** `demo@fitforge.app` / `Demo1234!`
+
+---
+
+## Features
+
+### Module 1 — AI Workout Planner
+- 5-step onboarding wizard (name, goal, level, equipment, schedule)
+- AI plan generation via **Groq API** (Llama 3.3 70B Versatile)
+- Collapsible animated day cards with exercises, sets, reps, warmup/cooldown notes
+- Plans saved to PostgreSQL — revisit any past plan without regenerating
+
+### Module 2 — Progress Tracker
+- **Workout logging** — log sets, reps, and weight per exercise from any plan
+- **Personal Records (PRs)** — automatically tracked per exercise; updates whenever a new weight or reps best is set
+- **Progress dashboard** — 4 stat cards, volume over time chart, weekly consistency chart, top-5 exercises chart
+- **Strength trend chart** — per-exercise line chart showing weight progression over time
+
+### Access
+- Demo account available instantly — no signup required
+- Full JWT-authenticated accounts with 24-hour tokens
 
 ---
 
@@ -10,104 +41,82 @@
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 18, React Router v6, Tailwind CSS, Framer Motion, Recharts |
-| Backend | FastAPI, Python 3.11, SQLAlchemy 2.0, Alembic |
-| Database | PostgreSQL |
-| AI | Groq API — Llama 3.3 70b Versatile |
-| Auth | JWT (python-jose, HS256), bcrypt password hashing |
-| Deployment | Backend → Render · Frontend → Vercel |
+| **Frontend** | React 18, React Router v6, Tailwind CSS, Framer Motion, Recharts |
+| **Backend** | Python 3.11, FastAPI 0.111, SQLAlchemy 2.0 |
+| **Database** | PostgreSQL 16, Alembic migrations |
+| **AI** | Groq API — Llama 3.3 70B Versatile |
+| **Auth** | JWT (python-jose HS256), bcrypt password hashing |
+| **Deployment** | Frontend → Vercel · Backend → Render |
+| **DevOps** | Docker + docker-compose for local Postgres |
 
 ---
 
-## Features
+## Live Demo
 
-- **AI Plan Generation** — Describe your goals and equipment; receive a complete weekly workout plan with exercises, sets, reps, rest periods, warmup and cooldown notes, and coaching tips
-- **Plan History** — Every generated plan is saved to your account so you can revisit or replay any past plan without regenerating
-- **Workout Logging** — Log each training day directly from the plan view: input actual sets, reps, and weight per exercise
-- **Progress Dashboard** — Four stat cards (total sessions, total volume, sessions this week, most trained exercise) plus three interactive charts — volume over time (line), weekly consistency (bar), and top exercises by frequency (horizontal bar)
-- **JWT Authentication** — Secure register/login flow; token persists in `localStorage` and is attached automatically to every API request
-- **Responsive Design** — Dark-themed UI built with Tailwind CSS, fully usable on mobile and desktop
+**URL:** [https://fitforge-six.vercel.app](https://fitforge-six.vercel.app)
 
----
+**Demo credentials:**
+```
+Email:    demo@fitforge.app
+Password: Demo1234!
+```
 
-## Screenshots
-
-> _Add screenshots or a short GIF here._
-
-| Onboarding | Plan View | Dashboard |
-|------------|-----------|-----------|
-| _(screenshot)_ | _(screenshot)_ | _(screenshot)_ |
+The demo account is pre-seeded with 5 workout sessions, 9 personal records, and populated charts so you can see the full dashboard immediately.
 
 ---
 
-## Running Locally
+## Local Setup
 
 ### Prerequisites
-
 - Python 3.11+
 - Node.js 18+
-- PostgreSQL (running locally, or use Docker)
+- PostgreSQL (or use Docker)
 
----
+### 1. Clone
+```bash
+git clone https://github.com/meetsutariya4448/fitforge.git
+cd fitforge
+```
 
-### Backend
-
+### 2. Backend
 ```bash
 cd backend
-
-# Create and activate a virtual environment
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
-
-# Install dependencies
 pip install -r requirements.txt
 
-# Copy env file and fill in your values
 cp .env.example .env
+# Fill in DATABASE_URL, SECRET_KEY, GROQ_API_KEY in .env
 
-# Run database migrations
-alembic upgrade head
-
-# Start the dev server
+alembic upgrade head             # Run all migrations
 uvicorn app.main:app --reload --port 8000
 ```
 
-API will be available at `http://localhost:8000`.  
-Interactive docs at `http://localhost:8000/docs`.
+API: `http://localhost:8000` · Docs: `http://localhost:8000/docs`
 
----
-
-### Frontend
-
+### 3. Frontend
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Copy env file and set the backend URL
 cp .env.example .env
-# For local dev the Vite proxy handles /api/* automatically —
-# you can leave VITE_API_BASE_URL blank or set it to http://localhost:8000
-
-# Start the dev server
+# VITE_API_BASE_URL is blank for local dev (Vite proxy handles it)
 npm run dev
 ```
 
-App will be available at `http://localhost:5173`.
+App: `http://localhost:5173`
 
----
-
-### Docker (optional)
-
-Spin up Postgres + the backend together:
-
+### 4. Seed demo data (optional)
 ```bash
-docker compose up --build
+cd backend
+source venv/bin/activate
+python -m scripts.seed_demo
 ```
 
-The backend will be available at `http://localhost:8000`.  
-Run the frontend separately with `npm run dev` inside `/frontend`.
+### Docker (alternative)
+```bash
+docker compose up --build   # starts Postgres + backend
+cd frontend && npm run dev  # frontend separately
+```
 
 ---
 
@@ -117,19 +126,36 @@ Run the frontend separately with `npm run dev` inside `/frontend`.
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `DATABASE_URL` | ✅ | PostgreSQL connection string, e.g. `postgresql://user:pass@localhost:5432/fitforge` |
-| `SECRET_KEY` | ✅ | Random string used to sign JWTs — keep secret in production |
+| `DATABASE_URL` | ✅ | PostgreSQL connection string |
+| `SECRET_KEY` | ✅ | Random secret for signing JWTs |
 | `GROQ_API_KEY` | ✅ | API key from [console.groq.com](https://console.groq.com) |
-| `GROQ_MODEL` | | Groq model ID (default: `llama-3.3-70b-versatile`) |
-| `APP_ENV` | | `development` or `production` (default: `development`) |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | | JWT lifetime in minutes (default: `1440` — 24 hours) |
-| `ALGORITHM` | | JWT signing algorithm (default: `HS256`) |
+| `GROQ_MODEL` | | Model ID (default: `llama-3.3-70b-versatile`) |
+| `APP_ENV` | | `development` or `production` |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | | JWT lifetime in minutes (default: `1440`) |
 
 ### Frontend (`frontend/.env`)
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `VITE_API_BASE_URL` | ✅ (production) | Full URL of the backend, e.g. `https://your-app.onrender.com`. Not needed locally — the Vite dev proxy handles it. |
+| `VITE_API_BASE_URL` | ✅ (production) | Backend URL e.g. `https://your-app.onrender.com` |
+
+---
+
+## API Reference
+
+| Method | Route | Auth | Description |
+|--------|-------|------|-------------|
+| `POST` | `/api/auth/register` | — | Create account, returns JWT |
+| `POST` | `/api/auth/login` | — | Login, returns JWT |
+| `GET` | `/api/auth/me` | ✅ | Current user profile |
+| `POST` | `/api/workout/generate` | ✅ | AI plan generation + save to DB |
+| `GET` | `/api/workout/history` | ✅ | All saved plans for user |
+| `POST` | `/api/sessions` | ✅ | Log workout session (auto-upserts PRs) |
+| `GET` | `/api/sessions` | ✅ | All sessions for user |
+| `GET` | `/api/sessions/exercise/{name}` | ✅ | Per-exercise strength trend data |
+| `GET` | `/api/sessions/{id}` | ✅ | Single session by ID |
+| `GET` | `/api/prs` | ✅ | All personal records for user |
+| `GET` | `/health` | — | Liveness probe |
 
 ---
 
@@ -139,45 +165,43 @@ Run the frontend separately with `npm run dev` inside `/frontend`.
 fitforge/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py          # FastAPI app, CORS, router registration
-│   │   ├── config.py        # pydantic-settings (reads .env)
-│   │   ├── database.py      # SQLAlchemy engine + session
-│   │   ├── models/          # ORM models (users, workout_plans, sessions)
-│   │   ├── schemas/         # Pydantic request/response schemas
-│   │   ├── routers/         # auth, workout, sessions endpoints
-│   │   └── services/        # auth_service (JWT/bcrypt), claude_service (Groq)
-│   ├── alembic/             # Database migrations
+│   │   ├── main.py             # FastAPI app, CORS, router registration
+│   │   ├── config.py           # pydantic-settings (reads .env)
+│   │   ├── models/             # User, WorkoutPlanRecord, WorkoutSession, ExerciseLog, PersonalRecord
+│   │   ├── schemas/            # Pydantic request/response schemas
+│   │   ├── routers/            # auth, workout, sessions (+ prs)
+│   │   └── services/           # auth_service (JWT/bcrypt), claude_service (Groq)
+│   ├── alembic/versions/       # 3 migrations: plans, sessions/logs, personal_records
+│   ├── scripts/seed_demo.py    # Idempotent demo data seeder
 │   ├── Dockerfile
 │   └── requirements.txt
 │
-├── frontend/
-│   └── src/
-│       ├── pages/           # Home, Auth, Onboarding, WorkoutPlanPage, PlansHistory, Dashboard
-│       ├── components/      # Button, Toast, LogWorkoutModal, DayCard, OnboardingForm, …
-│       └── services/
-│           └── api.js       # Axios client + all API functions
+├── frontend/src/
+│   ├── pages/                  # Home, Auth, Onboarding, WorkoutPlanPage, PlansHistory, Dashboard
+│   ├── components/
+│   │   ├── Navbar.jsx          # Shared responsive navbar (hamburger on mobile)
+│   │   ├── LogWorkoutModal.jsx # Sets/reps/weight logging modal
+│   │   ├── Toast.jsx           # Auto-dismiss notifications
+│   │   ├── onboarding/         # 5-step form wizard
+│   │   ├── workout/            # WorkoutPlan + DayCard
+│   │   └── ui/                 # Button, ProgressBar
+│   └── services/api.js         # Axios client + all API functions
 │
 └── docker-compose.yml
 ```
 
 ---
 
-## API Endpoints
+## Screenshots
 
-| Method | Route | Auth | Description |
-|--------|-------|------|-------------|
-| `POST` | `/api/auth/register` | — | Create account, returns JWT |
-| `POST` | `/api/auth/login` | — | Login, returns JWT |
-| `GET` | `/api/auth/me` | ✅ | Get current user profile |
-| `POST` | `/api/workout/generate` | ✅ | Generate AI workout plan + save to DB |
-| `GET` | `/api/workout/history` | ✅ | Get all saved plans for current user |
-| `POST` | `/api/sessions` | ✅ | Log a completed workout session |
-| `GET` | `/api/sessions` | ✅ | Get all sessions for current user |
-| `GET` | `/api/sessions/{id}` | ✅ | Get one session by ID |
-| `GET` | `/health` | — | Liveness probe |
+> _Add screenshots here_
+
+| Landing | Dashboard | Plan View |
+|---------|-----------|-----------|
+| _(screenshot)_ | _(screenshot)_ | _(screenshot)_ |
 
 ---
 
 ## License
 
-MIT
+MIT — built by [Meet Sutariya](https://github.com/meetsutariya4448) as a portfolio project.
