@@ -35,6 +35,15 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def include_object(object, name, type_, reflected, compare_to):
+    # kb_chunks uses TSVECTOR GENERATED ALWAYS AS ... STORED, which Alembic
+    # autogenerate cannot model. Exclude this table so that future
+    # `alembic revision --autogenerate` runs don't emit broken DDL for it.
+    if type_ == "table" and name == "kb_chunks":
+        return False
+    return True
+
+
 # ── Offline mode ──────────────────────────────────────────────────────────────
 
 def run_migrations_offline() -> None:
@@ -48,6 +57,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -69,6 +79,7 @@ def run_migrations_online() -> None:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
+            include_object=include_object,
         )
         with context.begin_transaction():
             context.run_migrations()

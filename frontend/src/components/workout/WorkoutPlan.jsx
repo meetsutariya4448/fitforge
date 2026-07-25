@@ -1,4 +1,4 @@
-import { Lightbulb, Sparkles } from 'lucide-react'
+import { AlertTriangle, BookOpen, Lightbulb, Sparkles } from 'lucide-react'
 import DayCard from './DayCard'
 
 /**
@@ -28,6 +28,18 @@ export default function WorkoutPlan({ plan, onLogDay }) {
         </h1>
 
         <p className="text-gray-400 leading-relaxed">{plan.summary}</p>
+
+        {/* ── Low-confidence warning ── */}
+        {plan.grounded === false && (
+          <div className="mt-5 flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-950/40 border border-amber-800/50">
+            <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-amber-300">
+              This plan is based on general fitness principles. Our knowledge base did not
+              find high-confidence reference material for your specific profile — consider
+              consulting a certified trainer for personalised guidance.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* ── Day cards ── */}
@@ -40,7 +52,8 @@ export default function WorkoutPlan({ plan, onLogDay }) {
             key={index}
             day={day}
             index={index}
-            defaultOpen={index === 0}  // First day starts expanded
+            defaultOpen={index === 0}
+            grounded={plan.grounded !== false}
             onLogDay={onLogDay}
           />
         ))}
@@ -60,6 +73,23 @@ export default function WorkoutPlan({ plan, onLogDay }) {
                   {i + 1}
                 </span>
                 {tip}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* ── Evidence base (citations) ── */}
+      {plan.citations?.length > 0 && (
+        <section className="card p-6 mt-3">
+          <div className="flex items-center gap-2 text-brand-400 mb-4">
+            <BookOpen className="w-5 h-5" />
+            <h2 className="font-semibold text-white">Evidence Base</h2>
+          </div>
+          <ul className="space-y-2">
+            {plan.citations.map((citation, i) => (
+              <li key={i} className="text-xs text-gray-400 leading-relaxed">
+                {citation}
               </li>
             ))}
           </ul>

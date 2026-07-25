@@ -98,6 +98,8 @@ class WorkoutPlan(BaseModel):
     days: List[WorkoutDay]
     general_tips: List[str]          # Nutrition, recovery, progression advice
     generated_for: str               # Echo back the user's name
+    citations: List[str] = []        # e.g. ["[1] ACSM rep range for hypertrophy"]
+    grounded: bool = True            # False when retrieval returned low_confidence
 
 
 class WorkoutPlanResponse(BaseModel):

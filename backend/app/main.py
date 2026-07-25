@@ -23,15 +23,16 @@ import app.models  # noqa: F401
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Run once on startup: ensure all database tables exist.
-
-    SQLAlchemy's create_all is idempotent — it only creates tables that
-    don't already exist, so it's safe to run on every startup.
-    For production migrations use Alembic instead.
+    Run once on startup: ensure all database tables exist, then pre-load
+    the RAG embedding and reranking models so the first plan-generation
+    request doesn't incur a ~30 s cold-start delay.
     """
     Base.metadata.create_all(bind=engine)
+    # Pre-load sentence-transformer models (downloads once, then cached)
+    from app.services.retrieval_service import _get_embed_model, _get_reranker
+    _get_embed_model()
+    _get_reranker()
     yield
-    # (shutdown logic would go here if needed)
 
 
 # ── App instance ─────────────────────────────────────────────────────────────

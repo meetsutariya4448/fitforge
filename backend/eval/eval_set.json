@@ -1,0 +1,332 @@
+[
+  {
+    "query_id": "q001",
+    "query": "What is progressive overload and why does it matter for building muscle?",
+    "onboarding_context": {
+      "fitness_goal": "build_muscle",
+      "fitness_level": "beginner",
+      "available_equipment": ["dumbbells"]
+    },
+    "expected_chunk_ids": [1, 2],
+    "notes": "chunk 1: definition + rationale; chunk 2: types of progressive overload (load, volume, density)"
+  },
+  {
+    "query_id": "q002",
+    "query": "How should I know when to increase the weight I am lifting?",
+    "onboarding_context": {
+      "fitness_goal": "build_muscle",
+      "fitness_level": "beginner",
+      "available_equipment": ["dumbbells"]
+    },
+    "expected_chunk_ids": [4, 3],
+    "notes": "chunk 4: rate of progression guidelines; chunk 3: how to apply overload practically"
+  },
+  {
+    "query_id": "q003",
+    "query": "What are the most common mistakes people make when trying to progress in the gym?",
+    "onboarding_context": {
+      "fitness_goal": "build_muscle",
+      "fitness_level": "intermediate",
+      "available_equipment": ["full_gym"]
+    },
+    "expected_chunk_ids": [7, 6],
+    "notes": "chunk 7: progressive overload mistakes; chunk 6: tracking progress methods"
+  },
+  {
+    "query_id": "q004",
+    "query": "When should I take a deload week and what does it involve?",
+    "onboarding_context": {
+      "fitness_goal": "build_muscle",
+      "fitness_level": "advanced",
+      "available_equipment": ["full_gym"]
+    },
+    "expected_chunk_ids": [5, 51],
+    "notes": "chunk 5: deload weeks in progressive overload; chunk 51: deload weeks in injury prevention context"
+  },
+  {
+    "query_id": "q005",
+    "query": "How many sets per week does ACSM recommend for a beginner to build muscle?",
+    "onboarding_context": {
+      "fitness_goal": "build_muscle",
+      "fitness_level": "beginner",
+      "available_equipment": ["dumbbells"]
+    },
+    "expected_chunk_ids": [10, 9],
+    "notes": "chunk 10: ACSM set volume; chunk 9: rep ranges for hypertrophy"
+  },
+  {
+    "query_id": "q006",
+    "query": "What rep range is best for building muscle size versus raw strength?",
+    "onboarding_context": {
+      "fitness_goal": "build_muscle",
+      "fitness_level": "intermediate",
+      "available_equipment": ["barbell"]
+    },
+    "expected_chunk_ids": [9, 10],
+    "notes": "chunk 9: ACSM rep range guidelines; chunk 10: set volume per goal"
+  },
+  {
+    "query_id": "q007",
+    "query": "How long should I rest between sets when training for muscle growth?",
+    "onboarding_context": {
+      "fitness_goal": "build_muscle",
+      "fitness_level": "beginner",
+      "available_equipment": ["dumbbells"]
+    },
+    "expected_chunk_ids": [11],
+    "notes": "chunk 11: ACSM rest period recommendations by training goal"
+  },
+  {
+    "query_id": "q008",
+    "query": "Should I do compound movements before isolation exercises in my workout?",
+    "onboarding_context": {
+      "fitness_goal": "build_muscle",
+      "fitness_level": "intermediate",
+      "available_equipment": ["full_gym"]
+    },
+    "expected_chunk_ids": [12],
+    "notes": "chunk 12: ACSM exercise order principles"
+  },
+  {
+    "query_id": "q009",
+    "query": "How many days per week should I be lifting weights for muscle gain?",
+    "onboarding_context": {
+      "fitness_goal": "build_muscle",
+      "fitness_level": "beginner",
+      "available_equipment": ["dumbbells"]
+    },
+    "expected_chunk_ids": [13, 69],
+    "notes": "chunk 13: ACSM training frequency; chunk 69: beginner program structure"
+  },
+  {
+    "query_id": "q010",
+    "query": "How much cardio per week does ACSM recommend to improve cardiovascular fitness?",
+    "onboarding_context": {
+      "fitness_goal": "improve_endurance",
+      "fitness_level": "beginner",
+      "available_equipment": ["no_equipment"]
+    },
+    "expected_chunk_ids": [17, 18],
+    "notes": "chunk 17: ACSM cardio recommendations; chunk 18: FITT principle for cardio"
+  },
+  {
+    "query_id": "q011",
+    "query": "What heart rate zone should I be running in to burn fat most effectively?",
+    "onboarding_context": {
+      "fitness_goal": "lose_weight",
+      "fitness_level": "intermediate",
+      "available_equipment": ["no_equipment"]
+    },
+    "expected_chunk_ids": [19, 21],
+    "notes": "chunk 19: HR zones for cardio training; chunk 21: RPE as an alternative to HR"
+  },
+  {
+    "query_id": "q012",
+    "query": "Is HIIT or steady state cardio better for fat loss?",
+    "onboarding_context": {
+      "fitness_goal": "lose_weight",
+      "fitness_level": "intermediate",
+      "available_equipment": ["no_equipment"]
+    },
+    "expected_chunk_ids": [29, 30],
+    "notes": "chunk 29: LISS vs HIIT comparison; chunk 30: EPOC from high intensity work"
+  },
+  {
+    "query_id": "q013",
+    "query": "How large a caloric deficit should I eat in to lose fat without losing muscle?",
+    "onboarding_context": {
+      "fitness_goal": "lose_weight",
+      "fitness_level": "intermediate",
+      "available_equipment": ["no_equipment"]
+    },
+    "expected_chunk_ids": [27, 26],
+    "notes": "chunk 27: caloric deficit specifics; chunk 26: energy balance fundamentals"
+  },
+  {
+    "query_id": "q014",
+    "query": "Is body recomposition real — can I lose fat and build muscle at the same time?",
+    "onboarding_context": {
+      "fitness_goal": "lose_weight",
+      "fitness_level": "beginner",
+      "available_equipment": ["dumbbells"]
+    },
+    "expected_chunk_ids": [31, 28],
+    "notes": "chunk 31: recomposition evidence; chunk 28: protein role in weight loss"
+  },
+  {
+    "query_id": "q015",
+    "query": "Why has my weight loss stalled even though I have not changed my diet?",
+    "onboarding_context": {
+      "fitness_goal": "lose_weight",
+      "fitness_level": "intermediate",
+      "available_equipment": ["no_equipment"]
+    },
+    "expected_chunk_ids": [32, 33],
+    "notes": "chunk 32: metabolic adaptation; chunk 33: common weight loss mistakes"
+  },
+  {
+    "query_id": "q016",
+    "query": "How long should I hold each stretch to actually improve my flexibility?",
+    "onboarding_context": {
+      "fitness_goal": "increase_flexibility",
+      "fitness_level": "beginner",
+      "available_equipment": ["no_equipment"]
+    },
+    "expected_chunk_ids": [38, 36],
+    "notes": "chunk 38: stretch duration guidelines; chunk 36: ACSM flexibility recommendations"
+  },
+  {
+    "query_id": "q017",
+    "query": "Should I stretch before or after lifting weights?",
+    "onboarding_context": {
+      "fitness_goal": "general_fitness",
+      "fitness_level": "intermediate",
+      "available_equipment": ["dumbbells"]
+    },
+    "expected_chunk_ids": [39, 37],
+    "notes": "chunk 39: timing of stretching; chunk 37: mobility for strength training"
+  },
+  {
+    "query_id": "q018",
+    "query": "What are the best dumbbell exercises for building muscle at home?",
+    "onboarding_context": {
+      "fitness_goal": "build_muscle",
+      "fitness_level": "beginner",
+      "available_equipment": ["dumbbells"]
+    },
+    "expected_chunk_ids": [42],
+    "notes": "chunk 42: equipment_tags=['dumbbells'] — dumbbell exercise selection"
+  },
+  {
+    "query_id": "q019",
+    "query": "What muscles can resistance bands target and what exercises can I do with them?",
+    "onboarding_context": {
+      "fitness_goal": "general_fitness",
+      "fitness_level": "beginner",
+      "available_equipment": ["resistance_bands"]
+    },
+    "expected_chunk_ids": [44],
+    "notes": "chunk 44: equipment_tags=['resistance_bands'] — band exercises and muscle coverage"
+  },
+  {
+    "query_id": "q020",
+    "query": "Can I build a good physique with only bodyweight training and no gym equipment?",
+    "onboarding_context": {
+      "fitness_goal": "build_muscle",
+      "fitness_level": "beginner",
+      "available_equipment": ["no_equipment"]
+    },
+    "expected_chunk_ids": [41],
+    "notes": "chunk 41: equipment_tags=['no_equipment'] — bodyweight training capability"
+  },
+  {
+    "query_id": "q021",
+    "query": "How do I increase my training volume safely without getting injured?",
+    "onboarding_context": {
+      "fitness_goal": "general_fitness",
+      "fitness_level": "intermediate",
+      "available_equipment": ["full_gym"]
+    },
+    "expected_chunk_ids": [49, 48],
+    "notes": "chunk 49: 10% rule for volume progression; chunk 48: overuse injury mechanisms"
+  },
+  {
+    "query_id": "q022",
+    "query": "How should I modify my workouts to keep training through a minor injury?",
+    "onboarding_context": {
+      "fitness_goal": "build_muscle",
+      "fitness_level": "intermediate",
+      "available_equipment": ["dumbbells"]
+    },
+    "expected_chunk_ids": [52, 53],
+    "notes": "chunk 52: training modification around injury; chunk 53: distinguishing DOMS from injury"
+  },
+  {
+    "query_id": "q023",
+    "query": "What should a proper warm-up look like before a heavy lifting session?",
+    "onboarding_context": {
+      "fitness_goal": "build_muscle",
+      "fitness_level": "intermediate",
+      "available_equipment": ["full_gym"]
+    },
+    "expected_chunk_ids": [50, 16],
+    "notes": "chunk 50: warm-up science in injury prevention; chunk 16: ACSM warm-up recommendations"
+  },
+  {
+    "query_id": "q024",
+    "query": "How does poor sleep affect muscle growth and strength gains?",
+    "onboarding_context": {
+      "fitness_goal": "build_muscle",
+      "fitness_level": "intermediate",
+      "available_equipment": ["full_gym"]
+    },
+    "expected_chunk_ids": [56, 57],
+    "notes": "chunk 56: sleep quality and muscle recovery; chunk 57: growth hormone release during sleep"
+  },
+  {
+    "query_id": "q025",
+    "query": "What are the signs that I am overtraining and need more rest?",
+    "onboarding_context": {
+      "fitness_goal": "build_muscle",
+      "fitness_level": "advanced",
+      "available_equipment": ["full_gym"]
+    },
+    "expected_chunk_ids": [60, 58],
+    "notes": "chunk 60: overtraining syndrome symptoms; chunk 58: HRV as a recovery marker"
+  },
+  {
+    "query_id": "q026",
+    "query": "What should I eat after a workout to maximise muscle recovery?",
+    "onboarding_context": {
+      "fitness_goal": "build_muscle",
+      "fitness_level": "beginner",
+      "available_equipment": ["dumbbells"]
+    },
+    "expected_chunk_ids": [61, 66],
+    "notes": "chunk 61: post-workout nutrition timing; chunk 66: pre/post workout nutrition specifics"
+  },
+  {
+    "query_id": "q027",
+    "query": "How much protein do I need per day to build muscle effectively?",
+    "onboarding_context": {
+      "fitness_goal": "build_muscle",
+      "fitness_level": "beginner",
+      "available_equipment": ["dumbbells"]
+    },
+    "expected_chunk_ids": [63],
+    "notes": "chunk 63: protein requirements for muscle building"
+  },
+  {
+    "query_id": "q028",
+    "query": "Are creatine and protein powder actually necessary or are they a waste of money?",
+    "onboarding_context": {
+      "fitness_goal": "build_muscle",
+      "fitness_level": "intermediate",
+      "available_equipment": ["full_gym"]
+    },
+    "expected_chunk_ids": [68],
+    "notes": "chunk 68: evidence-based supplement review"
+  },
+  {
+    "query_id": "q029",
+    "query": "How should a complete beginner structure their first training program?",
+    "onboarding_context": {
+      "fitness_goal": "build_muscle",
+      "fitness_level": "beginner",
+      "available_equipment": ["dumbbells"]
+    },
+    "expected_chunk_ids": [69, 72],
+    "notes": "chunk 69: beginner program design; chunk 72: goal-based program selection"
+  },
+  {
+    "query_id": "q030",
+    "query": "What is the difference between linear and undulating periodization and which is better for me?",
+    "onboarding_context": {
+      "fitness_goal": "build_muscle",
+      "fitness_level": "intermediate",
+      "available_equipment": ["full_gym"]
+    },
+    "expected_chunk_ids": [76, 77, 74],
+    "notes": "chunk 76: linear periodization; chunk 77: undulating periodization; chunk 74: periodization overview"
+  }
+]

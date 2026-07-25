@@ -14,7 +14,7 @@ import Button from '../ui/Button'
  * @param {number}   index       - Used for staggered entrance animation
  * @param {Function} onLogDay    - Optional callback; if provided renders "Log This Workout" button
  */
-export default function DayCard({ day, defaultOpen = false, index = 0, onLogDay }) {
+export default function DayCard({ day, defaultOpen = false, index = 0, grounded = true, onLogDay }) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
 
   return (
@@ -37,7 +37,14 @@ export default function DayCard({ day, defaultOpen = false, index = 0, onLogDay 
           </span>
 
           <div className="text-left">
-            <div className="font-semibold text-white text-sm">{day.day}</div>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-white text-sm">{day.day}</span>
+              {!grounded && (
+                <span className="text-xs px-1.5 py-0.5 rounded bg-amber-900/50 text-amber-400 font-medium">
+                  general guidance
+                </span>
+              )}
+            </div>
             <div className="text-gray-400 text-xs mt-0.5">{day.focus}</div>
           </div>
         </div>

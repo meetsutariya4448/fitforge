@@ -59,7 +59,7 @@ async def generate_plan(
     """
     # ── Step 2: AI generation ─────────────────────────────────────────────────
     try:
-        plan = await generate_workout_plan(data, session_history=data.session_history)
+        plan = await generate_workout_plan(data, session_history=data.session_history, db=db)
 
     except ValueError as exc:
         logger.warning("Plan generation schema error: %s", exc)

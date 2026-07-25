@@ -30,6 +30,13 @@ dist/
 *.log
 npm-debug.log*
 
+# Testing
+.pytest_cache/
+
+# ML model cache (sentence-transformers default: ~/.cache/huggingface/hub/)
+# Covered if anyone sets HF_HOME=./hf_cache locally
+hf_cache/
+
 # Misc
 *.tmp
 *.swp
