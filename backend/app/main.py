@@ -23,15 +23,18 @@ import app.models  # noqa: F401
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Run once on startup: ensure all database tables exist, then pre-load
-    the RAG embedding and reranking models so the first plan-generation
-    request doesn't incur a ~30 s cold-start delay.
+    Run once on startup: ensure all database tables exist.
+
+    ML models (embedding model and cross-encoder) are loaded lazily on first
+    use via _get_embed_model() / _get_reranker() in retrieval_service.py.
+    The first plan-generation request after a cold boot pays the load cost
+    (~5–15 s); subsequent requests reuse the cached singletons.
+
+    Pre-loading at startup was removed because loading ~175 MB of model
+    weights before the health-check window closes causes 503s on memory-
+    constrained hosts (e.g. Render free tier at 512 MB).
     """
     Base.metadata.create_all(bind=engine)
-    # Pre-load sentence-transformer models (downloads once, then cached)
-    from app.services.retrieval_service import _get_embed_model, _get_reranker
-    _get_embed_model()
-    _get_reranker()
     yield
 
 

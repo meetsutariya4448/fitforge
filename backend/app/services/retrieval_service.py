@@ -52,8 +52,8 @@ class RetrievalResult:
 
 # ---------------------------------------------------------------------------
 # Lazy model singletons — loaded once per process, reused across requests.
-# Call _get_embed_model() / _get_reranker() in main.py lifespan to pre-load
-# and avoid ~30 s cold-start latency on the first plan generation request.
+# Models are initialised on first call; the first plan-generation request
+# after a cold boot pays the load cost (~5–15 s on CPU-only hosts).
 # ---------------------------------------------------------------------------
 
 _embed_model = None
