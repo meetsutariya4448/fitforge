@@ -97,26 +97,25 @@ class TestRRFFuse:
 
 class TestConfidenceThreshold:
     def test_empty_candidates_is_low_confidence(self):
-        assert _is_low_confidence(top_score=0.0, candidate_count=0) is True
+        assert _is_low_confidence(top_score=0.0, candidate_count=0, threshold=-2.0) is True
 
     def test_score_below_threshold_is_low_confidence(self):
-        # Default threshold is -2.0; score of -5 is below it
-        assert _is_low_confidence(top_score=-5.0, candidate_count=3) is True
+        assert _is_low_confidence(top_score=-5.0, candidate_count=3, threshold=-2.0) is True
 
     def test_score_at_threshold_is_not_low_confidence(self):
-        # Strict less-than (<), so score exactly equal to threshold is NOT low confidence
-        from app.config import settings
-        threshold = settings.confidence_threshold
-        assert _is_low_confidence(top_score=threshold, candidate_count=3) is False
+        # Strict less-than (<): score == threshold is NOT low confidence
+        assert _is_low_confidence(top_score=-2.0, candidate_count=3, threshold=-2.0) is False
 
     def test_score_above_threshold_is_high_confidence(self):
-        # Score of 5.0 is well above -2.0 threshold
-        assert _is_low_confidence(top_score=5.0, candidate_count=3) is False
+        assert _is_low_confidence(top_score=5.0, candidate_count=3, threshold=-2.0) is False
 
     def test_score_just_above_threshold_is_high_confidence(self):
-        from app.config import settings
-        just_above = settings.confidence_threshold + 0.001
-        assert _is_low_confidence(top_score=just_above, candidate_count=1) is False
+        assert _is_low_confidence(top_score=-1.999, candidate_count=1, threshold=-2.0) is False
+
+    def test_rrf_scale_threshold(self):
+        # RRF scores are ~0.010–0.033; threshold 0.020 should gate correctly.
+        assert _is_low_confidence(top_score=0.010, candidate_count=2, threshold=0.020) is True
+        assert _is_low_confidence(top_score=0.031, candidate_count=2, threshold=0.020) is False
 
 
 # ============================================================================
@@ -388,13 +387,36 @@ class TestRetrieve:
                           retrieval_mode="hybrid_rerank")
         assert result.low_confidence is True
 
-    def test_non_reranked_modes_never_set_low_confidence(self, monkeypatch, mock_embed_model):
-        """sparse_only / dense_only / hybrid don't use cross-encoder so low_confidence=False."""
-        for mode in ("sparse_only", "dense_only", "hybrid"):
+    def test_sparse_dense_always_confident(self, monkeypatch, mock_embed_model):
+        """sparse_only / dense_only don't gate on retrieval confidence — always False."""
+        for mode in ("sparse_only", "dense_only"):
             db, _ = self._make_fake_db(monkeypatch)
             result = retrieve("query", self._make_onboarding(), db=db,
                               retrieval_mode=mode)
             assert result.low_confidence is False, f"mode={mode} unexpectedly set low_confidence"
+
+    def test_hybrid_low_confidence_on_empty_results(self, monkeypatch, mock_embed_model):
+        """hybrid with no retrieved chunks must return low_confidence=True."""
+        db, _ = self._make_fake_db(monkeypatch, dense_rows=[], sparse_rows=[], chunk_rows=[])
+        result = retrieve("obscure query", self._make_onboarding(), db=db,
+                          retrieval_mode="hybrid")
+        assert result.low_confidence is True
+
+    def test_hybrid_high_confidence_with_results(self, monkeypatch, mock_embed_model):
+        """hybrid with top-1 RRF score above rrf_confidence_threshold is high confidence.
+
+        Two chunks at rank 1 in both dense and sparse → top-1 RRF ≈ 1/61+1/61 ≈ 0.032,
+        well above the 0.020 threshold.
+        """
+        rows = [(1, "raw 1", "ctx 1", {}, 0.9), (2, "raw 2", "ctx 2", {}, 0.8)]
+        db, _ = self._make_fake_db(
+            monkeypatch,
+            dense_rows=rows, sparse_rows=rows,
+            chunk_rows=[(1, "raw 1", "ctx 1", {}), (2, "raw 2", "ctx 2", {})],
+        )
+        result = retrieve("fitness query", self._make_onboarding(), db=db,
+                          retrieval_mode="hybrid")
+        assert result.low_confidence is False
 
     def test_retrieve_respects_k_limit(self, monkeypatch, mock_embed_model, mock_reranker):
         """Result should contain at most k chunks."""
