@@ -235,7 +235,17 @@ def _sparse_search(
 # Fetch chunks by ID list (used after RRF to hydrate fused result set)
 # ---------------------------------------------------------------------------
 
-def _fetch_chunks_by_ids(db: Session, ids: list[int]) -> list[ChunkResult]:
+def _fetch_chunks_by_ids(
+    db: Session,
+    ids: list[int],
+    scores: dict[int, float] | None = None,
+) -> list[ChunkResult]:
+    """Hydrate chunk rows for a list of IDs, preserving the caller's ordering.
+
+    scores, if provided, is a mapping of chunk_id → fused RRF score.  Each
+    returned ChunkResult.score is set from that mapping (0.0 for missing IDs).
+    Passing scores=None leaves all scores at 0.0 (legacy behaviour).
+    """
     if not ids:
         return []
     sql = text("""
@@ -244,7 +254,7 @@ def _fetch_chunks_by_ids(db: Session, ids: list[int]) -> list[ChunkResult]:
         WHERE id = ANY(:ids)
     """)
     rows = db.execute(sql, {"ids": ids}).fetchall()
-    # Preserve the RRF-fused order (rows come back in DB order)
+    # Preserve the RRF-fused order (rows come back in DB storage order)
     row_map = {r.id: r for r in rows}
     return [
         ChunkResult(
@@ -252,7 +262,7 @@ def _fetch_chunks_by_ids(db: Session, ids: list[int]) -> list[ChunkResult]:
             raw_content=row_map[cid].raw_content,
             contextualized_content=row_map[cid].contextualized_content,
             metadata=row_map[cid].metadata,
-            score=0.0,
+            score=scores[cid] if (scores and cid in scores) else 0.0,
         )
         for cid in ids
         if cid in row_map
@@ -379,8 +389,10 @@ def retrieve(
             [c.chunk_id for c in dense_results],
             [c.chunk_id for c in sparse_results],
         )
-        fused_ids = [cid for cid, _ in fused[:20]]
-        candidates = _fetch_chunks_by_ids(db, fused_ids)
+        fused_top = fused[:20]
+        fused_ids = [cid for cid, _ in fused_top]
+        fused_score_map = dict(fused_top)
+        candidates = _fetch_chunks_by_ids(db, fused_ids, scores=fused_score_map)
 
     # ── Reranking + confidence ────────────────────────────────────────────────
     if mode == "hybrid_rerank":
