@@ -31,5 +31,16 @@ class UserOut(BaseModel):
 class TokenResponse(BaseModel):
     """JWT token returned after successful login/register."""
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
     user: UserOut
+
+
+class RefreshRequest(BaseModel):
+    """Payload for rotating a refresh token."""
+    refresh_token: str
+
+
+class DeleteAccountRequest(BaseModel):
+    """Password confirmation required before account deletion."""
+    password: str

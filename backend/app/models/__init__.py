@@ -5,3 +5,6 @@ from app.models.workout_plan import WorkoutPlanRecord     # noqa: F401
 from app.models.workout_session import WorkoutSession, ExerciseLog  # noqa: F401
 from app.models.personal_record import PersonalRecord     # noqa: F401
 from app.models.kb_chunk import KBChunk                   # noqa: F401
+from app.models.refresh_token import RefreshToken         # noqa: F401
+from app.models.experiment_run import ExperimentRun       # noqa: F401
+from app.models.request_trace import RequestTrace         # noqa: F401

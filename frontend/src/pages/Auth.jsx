@@ -55,8 +55,11 @@ export default function Auth() {
         })
       }
 
-      // Save JWT and user info so the Navbar can show the user's name
+      // Save tokens and user info; refresh token enables silent re-auth
       localStorage.setItem('fitforge_token', response.access_token)
+      if (response.refresh_token) {
+        localStorage.setItem('fitforge_refresh_token', response.refresh_token)
+      }
       if (response.user) {
         localStorage.setItem('fitforge_user', JSON.stringify(response.user))
       }

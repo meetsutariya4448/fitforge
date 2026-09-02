@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+
+  # ── Job 1: Unit tests — no database required ──────────────────────────────────
+  unit-tests:
+    name: Unit tests (Python 3.11)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      # Install CPU-only PyTorch before requirements.txt so pip finds it
+      # already present and skips the large CUDA build that
+      # sentence-transformers would otherwise pull in.
+      - name: Install CPU-only PyTorch
+        run: |
+          pip install torch==2.3.1+cpu \
+            --index-url https://download.pytorch.org/whl/cpu \
+            --quiet
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt --quiet
+
+      - name: Run unit tests
+        run: python -m pytest tests/test_retrieval.py tests/test_generation.py tests/test_agent.py -v --tb=short
+        env:
+          DATABASE_URL: "postgresql://ci:ci@localhost/ci"
+          SECRET_KEY: "ci-secret-not-for-production"
+          GROQ_API_KEY: "ci-placeholder"
+
+  # ── Job 2: Integration tests — real PostgreSQL 16 ─────────────────────────────
+  integration-tests:
+    name: Integration tests (Python 3.11 + PostgreSQL 16)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: fitforge_test
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: "postgresql://ci:ci@localhost:5432/fitforge_test"
+      SECRET_KEY: "ci-secret-not-for-production"
+      GROQ_API_KEY: "ci-placeholder"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install CPU-only PyTorch
+        run: |
+          pip install torch==2.3.1+cpu \
+            --index-url https://download.pytorch.org/whl/cpu \
+            --quiet
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt --quiet
+
+      - name: Apply database migrations
+        run: alembic upgrade head
+
+      - name: Run integration tests
+        run: python -m pytest tests/test_api.py -v --tb=short
+
+  # ── Job 3: Frontend build ──────────────────────────────────────────────────────
+  frontend-build:
+    name: Frontend build (Node 20)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: "https://placeholder.example.com"

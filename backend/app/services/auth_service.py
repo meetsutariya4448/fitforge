@@ -10,6 +10,8 @@ Routes import these functions instead of touching jose/passlib directly,
 keeping auth logic centralised and easy to unit-test.
 """
 
+import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -22,6 +24,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.models.user import User
+from app.models.refresh_token import RefreshToken
 
 # ── Password hashing ──────────────────────────────────────────────────────────
 
@@ -89,6 +92,72 @@ def _decode_token(token: str) -> Optional[int]:
         return None
 
 
+# ── Refresh tokens ────────────────────────────────────────────────────────────
+
+def _hash_token(raw: str) -> str:
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def create_refresh_token(user_id: int, db: Session, device_info: Optional[str] = None) -> str:
+    """
+    Mint a new refresh token, persist its SHA-256 hash, and return the raw value.
+
+    The raw token is returned exactly once and never stored — only the hash
+    is kept in the DB. The caller must include it in the HTTP response immediately.
+    """
+    raw = secrets.token_urlsafe(48)
+    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)
+    row = RefreshToken(
+        user_id=user_id,
+        token_hash=_hash_token(raw),
+        device_info=device_info,
+        expires_at=expires_at,
+    )
+    db.add(row)
+    db.commit()
+    return raw
+
+
+def rotate_refresh_token(raw_token: str, db: Session) -> tuple[str, int]:
+    """
+    Validate the provided refresh token, revoke it, and issue a new pair.
+
+    Returns (new_raw_refresh_token, user_id).
+    Raises HTTP 401 if the token is unknown, already revoked, or expired.
+    """
+    token_hash = _hash_token(raw_token)
+    row = db.query(RefreshToken).filter(RefreshToken.token_hash == token_hash).first()
+
+    invalid = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Refresh token invalid or expired.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    if row is None:
+        raise invalid
+    if row.revoked_at is not None:
+        raise invalid
+    if row.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+        raise invalid
+
+    # Revoke the used token — strict rotation: each token is one-time use.
+    row.revoked_at = datetime.now(timezone.utc)
+    db.commit()
+
+    new_raw = create_refresh_token(row.user_id, db, device_info=row.device_info)
+    return new_raw, row.user_id
+
+
+def revoke_refresh_token(raw_token: str, db: Session) -> None:
+    """Mark a refresh token revoked (used on logout). Silent no-op if not found."""
+    token_hash = _hash_token(raw_token)
+    row = db.query(RefreshToken).filter(RefreshToken.token_hash == token_hash).first()
+    if row and row.revoked_at is None:
+        row.revoked_at = datetime.now(timezone.utc)
+        db.commit()
+
+
 # ── FastAPI dependency ─────────────────────────────────────────────────────────
 
 def get_current_user(
@@ -119,5 +188,8 @@ def get_current_user(
     user = db.get(User, user_id)
     if user is None:
         raise credentials_exception
+
+    from app.tracing import update_trace
+    update_trace(user_id=user_id)
 
     return user

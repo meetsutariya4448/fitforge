@@ -12,10 +12,13 @@ GET /api/workout/history
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.limiter import limiter
 from app.models.user import User
 from app.models.workout_plan import WorkoutPlanRecord
 from app.schemas.workout import (
@@ -45,7 +48,9 @@ logger = logging.getLogger(__name__)
     ),
     status_code=status.HTTP_200_OK,
 )
+@limiter.limit("20/minute")
 async def generate_plan(
+    request: Request,
     data: OnboardingData,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -105,27 +110,95 @@ async def generate_plan(
     response_model=WorkoutHistoryResponse,
     summary="Get the authenticated user's workout plan history",
     description=(
-        "Returns all workout plans previously generated for the logged-in "
-        "user, ordered newest-first. Each entry includes the full plan JSON "
-        "so the frontend can replay any past plan without calling the AI again."
+        "Returns workout plans newest-first, cursor-paginated. "
+        "Pass ?cursor=<id> to fetch the next page. "
+        "next_cursor in the response is null when no more pages exist."
     ),
     status_code=status.HTTP_200_OK,
 )
 def get_history(
+    cursor: Optional[int] = Query(None, description="Return plans with id < cursor (for next-page fetches)"),
+    limit: int = Query(20, ge=1, le=100, description="Plans per page"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Fetches all WorkoutPlanRecord rows belonging to current_user,
-    ordered by created_at descending.
-    """
-    records = (
+    q = (
         db.query(WorkoutPlanRecord)
         .filter(WorkoutPlanRecord.user_id == current_user.id)
-        .order_by(WorkoutPlanRecord.created_at.desc())
-        .all()
+    )
+    if cursor is not None:
+        q = q.filter(WorkoutPlanRecord.id < cursor)
+
+    # Fetch limit+1 to detect whether a next page exists.
+    records = q.order_by(WorkoutPlanRecord.id.desc()).limit(limit + 1).all()
+
+    has_more = len(records) > limit
+    page = records[:limit]
+    next_cursor = page[-1].id if has_more and page else None
+
+    # Total count for the current user (ignoring cursor, for UI display).
+    total = db.query(WorkoutPlanRecord).filter(
+        WorkoutPlanRecord.user_id == current_user.id
+    ).count()
+
+    return WorkoutHistoryResponse(
+        plans=[WorkoutPlanHistoryItem.model_validate(r) for r in page],
+        total=total,
+        next_cursor=next_cursor,
     )
 
-    items = [WorkoutPlanHistoryItem.model_validate(r) for r in records]
 
-    return WorkoutHistoryResponse(plans=items, total=len(items))
+# ── POST /generate-agent ──────────────────────────────────────────────────────
+
+@router.post(
+    "/generate-agent",
+    response_model=WorkoutPlanResponse,
+    summary="Generate a workout plan via self-reflection agent",
+    description=(
+        "Runs a LangGraph critique loop on top of the RAG pipeline: "
+        "retrieve → generate → critique → (refine → critique) × N. "
+        "Returns the highest-scoring plan seen across all iterations. "
+        "The existing /generate endpoint is unchanged."
+    ),
+    status_code=status.HTTP_200_OK,
+)
+@limiter.limit("10/minute")
+async def generate_plan_agent(
+    request: Request,
+    data: OnboardingData,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.agent_service import run_agent
+    try:
+        plan = await run_agent(data, session_history=data.session_history, db=db)
+    except ValueError as exc:
+        logger.warning("Agent plan schema error: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Agent returned an unexpected response format. ({exc})",
+        ) from exc
+    except Exception:
+        logger.exception("Unexpected error in generate-agent")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred in the agent. Please try again.",
+        )
+
+    record = WorkoutPlanRecord(
+        user_id=current_user.id,
+        goal=data.fitness_goal.value,
+        fitness_level=data.fitness_level.value,
+        days_per_week=data.days_per_week,
+        plan_json=plan.model_dump(),
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+
+    logger.info(
+        "Saved agent plan id=%d for user_id=%d (goal=%s)",
+        record.id, current_user.id, record.goal,
+    )
+
+    return WorkoutPlanResponse(success=True, plan=plan)

@@ -127,9 +127,14 @@ class WorkoutPlanHistoryItem(BaseModel):
 
 
 class WorkoutHistoryResponse(BaseModel):
-    """Response for the history endpoint — ordered newest-first."""
+    """Response for the history endpoint — ordered newest-first.
+
+    Cursor-paginated: pass next_cursor as ?cursor=<id> to fetch the next page.
+    next_cursor is None when no more pages exist.
+    """
     plans: List[WorkoutPlanHistoryItem]
     total: int
+    next_cursor: Optional[int] = None
 
 
 # ── Session schemas ───────────────────────────────────────────────────────────

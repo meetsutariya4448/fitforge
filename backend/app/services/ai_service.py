@@ -14,6 +14,7 @@ all AI-specific logic so it can be swapped or tested independently.
 
 import json
 import logging
+import time
 from typing import Optional
 
 from groq import Groq, APIError
@@ -21,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.schemas.workout import OnboardingData, WorkoutPlan
+from app.tracing import update_trace
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +204,15 @@ async def generate_workout_plan(
         from app.services.retrieval_service import retrieve
         query = _build_retrieval_query(data)
         logger.info("Retrieving KB chunks for query: %r", query)
+
+        _t_retr = time.perf_counter()
         retrieval_result = retrieve(query, data, k=5, db=db)
+        update_trace(
+            retrieval_ms=round((time.perf_counter() - _t_retr) * 1000, 1),
+            retrieval_mode=settings.retrieval_mode,
+            num_chunks_retrieved=len(retrieval_result.chunks),
+            low_confidence=retrieval_result.low_confidence,
+        )
 
         if retrieval_result.low_confidence:
             logger.info("Retrieval low_confidence — injecting fallback note")
@@ -222,6 +232,7 @@ async def generate_workout_plan(
     )
 
     try:
+        _t_llm = time.perf_counter()
         completion = client.chat.completions.create(
             model=settings.groq_model,
             max_tokens=4096,
@@ -229,6 +240,12 @@ async def generate_workout_plan(
                 {"role": "system", "content": _build_system_prompt(generation_mode)},
                 {"role": "user",   "content": _build_user_prompt(data, session_history, context_block)},
             ],
+        )
+        update_trace(
+            llm_ms=round((time.perf_counter() - _t_llm) * 1000, 1),
+            model=settings.groq_model,
+            prompt_tokens=completion.usage.prompt_tokens if completion.usage else None,
+            completion_tokens=completion.usage.completion_tokens if completion.usage else None,
         )
     except APIError as exc:
         logger.error("Groq API error: %s", exc)

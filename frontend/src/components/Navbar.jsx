@@ -25,10 +25,18 @@ export default function Navbar() {
   })()
   const firstName = user?.name?.split(' ')[0] ?? 'Account'
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const refreshToken = localStorage.getItem('fitforge_refresh_token')
     localStorage.removeItem('fitforge_token')
+    localStorage.removeItem('fitforge_refresh_token')
     localStorage.removeItem('fitforge_user')
     setMenuOpen(false)
+    if (refreshToken) {
+      // Fire-and-forget: revoke server-side; don't block navigation on failure.
+      import('../services/api').then(({ default: apiClient }) => {
+        apiClient.post('/api/auth/logout', { refresh_token: refreshToken }).catch(() => {})
+      })
+    }
     navigate('/')
   }
 

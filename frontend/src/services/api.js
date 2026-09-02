@@ -22,15 +22,64 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
-// ── Response interceptor: handle 401 globally ────────────────────────────
+// ── Response interceptor: silent token refresh on 401 ─────────────────────
+// If a request gets a 401, attempt one silent refresh using the stored
+// refresh token. On success, retry the original request with the new
+// access token. On failure (missing/expired refresh token), clear storage
+// and redirect to /auth.
+
+let _refreshPromise = null  // serialise concurrent refresh attempts
+
+function _clearSession() {
+  localStorage.removeItem('fitforge_token')
+  localStorage.removeItem('fitforge_refresh_token')
+  localStorage.removeItem('fitforge_user')
+  if (window.location.pathname !== '/auth') window.location.href = '/auth'
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('fitforge_token')
-      localStorage.removeItem('fitforge_user')
-      if (window.location.pathname !== '/auth') window.location.href = '/auth'
+  async (error) => {
+    const originalRequest = error.config
+
+    // Only attempt refresh once per request (_retry flag) and only on 401s
+    // that are not themselves the refresh endpoint (avoid infinite loops).
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes('/api/auth/refresh')
+    ) {
+      originalRequest._retry = true
+
+      const refreshToken = localStorage.getItem('fitforge_refresh_token')
+      if (!refreshToken) {
+        _clearSession()
+        return Promise.reject(error)
+      }
+
+      try {
+        // Serialise: if multiple requests 401 simultaneously, only one
+        // refresh call is made; others wait for the same promise.
+        if (!_refreshPromise) {
+          _refreshPromise = apiClient
+            .post('/api/auth/refresh', { refresh_token: refreshToken })
+            .finally(() => { _refreshPromise = null })
+        }
+
+        const { data } = await _refreshPromise
+        localStorage.setItem('fitforge_token', data.access_token)
+        localStorage.setItem('fitforge_refresh_token', data.refresh_token)
+        if (data.user) localStorage.setItem('fitforge_user', JSON.stringify(data.user))
+
+        // Retry original request with the new access token.
+        originalRequest.headers.Authorization = `Bearer ${data.access_token}`
+        return apiClient(originalRequest)
+      } catch {
+        _clearSession()
+        return Promise.reject(error)
+      }
     }
+
     return Promise.reject(error)
   },
 )

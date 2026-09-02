@@ -18,7 +18,8 @@ class Settings(BaseSettings):
     # ── JWT ──────────────────────────────────────────────────────
     secret_key: str = "change-this-secret-in-production"
     algorithm: str = "HS256"
-    access_token_expire_minutes: int = 1440
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 30
 
     # ── Groq ─────────────────────────────────────────────────────
     groq_api_key: str = ""
@@ -47,6 +48,12 @@ class Settings(BaseSettings):
     # at +330ms median latency per request.  hybrid_rerank remains a valid mode
     # and can be re-enabled by setting RETRIEVAL_MODE=hybrid_rerank in .env.
     retrieval_mode: str = "hybrid"
+
+    # ── LangGraph agent ──────────────────────────────────────────
+    # refine cycles allowed per request; 0 = generate + critique only (no refine)
+    agent_max_iterations: int = 2
+    # score >= threshold AND no equipment violation → accepted; otherwise refine
+    agent_critique_threshold: float = 0.75
 
     model_config = SettingsConfigDict(
         env_file=".env",
