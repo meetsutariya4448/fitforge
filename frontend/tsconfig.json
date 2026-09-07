@@ -28,5 +28,5 @@
     /* Vite handles emit; tsc is used only as a type checker. */
     "noEmit": true
   },
-  "include": ["src"]
+  "include": ["src", "e2e", "*.config.ts"]
 }
