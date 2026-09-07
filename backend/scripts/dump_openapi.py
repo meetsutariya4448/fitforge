@@ -10,9 +10,14 @@ import json
 import sys
 from pathlib import Path
 
+# Running `python scripts/dump_openapi.py` puts scripts/ on sys.path, not the
+# backend root, so `import app` fails. Add the root explicitly rather than
+# requiring every caller to remember PYTHONPATH.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 # Importing the app is enough — app.openapi() builds the document from the
 # Pydantic models and never touches the database.
-from app.main import app
+from app.main import app  # noqa: E402
 
 
 def main() -> None:

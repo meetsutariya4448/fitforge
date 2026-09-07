@@ -291,18 +291,23 @@ def _build_graph():
     workflow = StateGraph(AgentState)
     workflow.add_node("retrieve", retrieve_node)
     workflow.add_node("generate", generate_node)
-    workflow.add_node("critique", critique_node)
+    # Node name deliberately differs from the "critique" state key it writes.
+    # LangGraph rejects a node whose name collides with a state key
+    # (ValueError: 'critique' is already being used as a state key), which is
+    # what broke graph construction — and with it every test in this module —
+    # once the unpinned langgraph dependency moved past 0.2.
+    workflow.add_node("critique_plan", critique_node)
     workflow.add_node("refine", refine_node)
 
     workflow.set_entry_point("retrieve")
     workflow.add_edge("retrieve", "generate")
-    workflow.add_edge("generate", "critique")
+    workflow.add_edge("generate", "critique_plan")
     workflow.add_conditional_edges(
-        "critique",
+        "critique_plan",
         route_after_critique,
         {"refine": "refine", "__end__": END},
     )
-    workflow.add_edge("refine", "critique")
+    workflow.add_edge("refine", "critique_plan")
 
     return workflow.compile()
 
