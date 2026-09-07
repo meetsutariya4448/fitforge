@@ -96,7 +96,20 @@ def _parse_judge_response(raw: str) -> dict:
     return json.loads(raw)
 
 
-def score_faithfulness(context: str, plan_text: str, client: Groq) -> dict:
+# Groq pricing (as of 2026-08-16, per million tokens)
+_JUDGE_INPUT_COST_PER_M  = 0.05   # llama-3.1-8b-instant input
+_JUDGE_OUTPUT_COST_PER_M = 0.08   # llama-3.1-8b-instant output
+
+
+def _judge_cost(prompt_tokens: int, completion_tokens: int) -> float:
+    return (
+        prompt_tokens * _JUDGE_INPUT_COST_PER_M / 1_000_000
+        + completion_tokens * _JUDGE_OUTPUT_COST_PER_M / 1_000_000
+    )
+
+
+def score_faithfulness(context: str, plan_text: str, client: Groq) -> tuple[dict, dict]:
+    """Returns (result_dict, usage_dict) where usage_dict has prompt_tokens, completion_tokens, cost_usd."""
     resp = client.chat.completions.create(
         model=JUDGE_MODEL,
         messages=[
@@ -108,11 +121,15 @@ def score_faithfulness(context: str, plan_text: str, client: Groq) -> dict:
         max_tokens=200,
         temperature=0.0,
     )
-    return _parse_judge_response(resp.choices[0].message.content)
+    pt = resp.usage.prompt_tokens if resp.usage else 0
+    ct = resp.usage.completion_tokens if resp.usage else 0
+    usage = {"prompt_tokens": pt, "completion_tokens": ct, "cost_usd": _judge_cost(pt, ct)}
+    return _parse_judge_response(resp.choices[0].message.content), usage
 
 
 def score_relevancy(goal: str, level: str, equipment: str,
-                    title: str, summary: str, client: Groq) -> dict:
+                    title: str, summary: str, client: Groq) -> tuple[dict, dict]:
+    """Returns (result_dict, usage_dict) where usage_dict has prompt_tokens, completion_tokens, cost_usd."""
     resp = client.chat.completions.create(
         model=JUDGE_MODEL,
         messages=[
@@ -125,7 +142,10 @@ def score_relevancy(goal: str, level: str, equipment: str,
         max_tokens=200,
         temperature=0.0,
     )
-    return _parse_judge_response(resp.choices[0].message.content)
+    pt = resp.usage.prompt_tokens if resp.usage else 0
+    ct = resp.usage.completion_tokens if resp.usage else 0
+    usage = {"prompt_tokens": pt, "completion_tokens": ct, "cost_usd": _judge_cost(pt, ct)}
+    return _parse_judge_response(resp.choices[0].message.content), usage
 
 
 # ---------------------------------------------------------------------------
@@ -215,8 +235,14 @@ async def _run(sample: int) -> None:
 
             # ── Judge faithfulness ───────────────────────────────────────────
             faith_result, relev_result = {}, {}
+            judge_prompt_tokens = 0
+            judge_completion_tokens = 0
+            judge_cost_usd = 0.0
             try:
-                faith_result = score_faithfulness(context_text, plan_text, judge)
+                faith_result, faith_usage = score_faithfulness(context_text, plan_text, judge)
+                judge_prompt_tokens     += faith_usage["prompt_tokens"]
+                judge_completion_tokens += faith_usage["completion_tokens"]
+                judge_cost_usd          += faith_usage["cost_usd"]
                 print(f"    faithfulness={faith_result.get('score', '?'):.2f}  {faith_result.get('reasoning', '')[:60]}")
             except Exception as exc:
                 print(f"    WARN faithfulness: {exc}")
@@ -224,22 +250,28 @@ async def _run(sample: int) -> None:
             # ── Judge relevancy ──────────────────────────────────────────────
             try:
                 eq_str = ", ".join(ctx["available_equipment"])
-                relev_result = score_relevancy(
+                relev_result, relev_usage = score_relevancy(
                     ctx["fitness_goal"], ctx["fitness_level"], eq_str,
                     plan.title, plan.summary, judge,
                 )
+                judge_prompt_tokens     += relev_usage["prompt_tokens"]
+                judge_completion_tokens += relev_usage["completion_tokens"]
+                judge_cost_usd          += relev_usage["cost_usd"]
                 print(f"    relevancy   ={relev_result.get('score', '?'):.2f}  {relev_result.get('reasoning', '')[:60]}")
             except Exception as exc:
                 print(f"    WARN relevancy: {exc}")
 
             records.append({
-                "query_id":            q["query_id"],
-                "grounded":            plan.grounded,
-                "faithfulness_score":  faith_result.get("score"),
-                "faithfulness_reason": faith_result.get("reasoning", ""),
-                "relevancy_score":     relev_result.get("score"),
-                "relevancy_reason":    relev_result.get("reasoning", ""),
-                "latency_s":           latency_s,
+                "query_id":              q["query_id"],
+                "grounded":              plan.grounded,
+                "faithfulness_score":    faith_result.get("score"),
+                "faithfulness_reason":   faith_result.get("reasoning", ""),
+                "relevancy_score":       relev_result.get("score"),
+                "relevancy_reason":      relev_result.get("reasoning", ""),
+                "latency_s":             latency_s,
+                "judge_prompt_tokens":   judge_prompt_tokens,
+                "judge_completion_tokens": judge_completion_tokens,
+                "judge_cost_usd":        judge_cost_usd,
             })
 
             time.sleep(0.5)   # Groq rate-limit headroom
@@ -248,9 +280,12 @@ async def _run(sample: int) -> None:
 
     # ── Aggregate ────────────────────────────────────────────────────────────
 
-    faith_scores = [r["faithfulness_score"] for r in records if r.get("faithfulness_score") is not None]
-    relev_scores = [r["relevancy_score"]    for r in records if r.get("relevancy_score")    is not None]
-    latencies    = sorted(r["latency_s"]    for r in records if r.get("latency_s")          is not None)
+    faith_scores   = [r["faithfulness_score"] for r in records if r.get("faithfulness_score") is not None]
+    relev_scores   = [r["relevancy_score"]    for r in records if r.get("relevancy_score")    is not None]
+    latencies      = sorted(r["latency_s"]    for r in records if r.get("latency_s")          is not None)
+    all_pt         = [r.get("judge_prompt_tokens", 0)     for r in records if "latency_s" in r]
+    all_ct         = [r.get("judge_completion_tokens", 0) for r in records if "latency_s" in r]
+    all_cost       = [r.get("judge_cost_usd", 0.0)        for r in records if "latency_s" in r]
 
     mean_faith = statistics.mean(faith_scores) if faith_scores else float("nan")
     std_faith  = statistics.stdev(faith_scores) if len(faith_scores) > 1 else 0.0
@@ -258,24 +293,31 @@ async def _run(sample: int) -> None:
     std_relev  = statistics.stdev(relev_scores) if len(relev_scores) > 1 else 0.0
     p50_lat    = statistics.median(latencies) if latencies else float("nan")
     p95_lat    = latencies[max(0, int(len(latencies) * 0.95) - 1)] if latencies else float("nan")
+    avg_pt     = statistics.mean(all_pt)   if all_pt   else 0.0
+    avg_ct     = statistics.mean(all_ct)   if all_ct   else 0.0
+    avg_cost   = statistics.mean(all_cost) if all_cost else 0.0
+    total_cost = sum(all_cost)
 
     print(f"\nFaithfulness:   {mean_faith:.3f} ± {std_faith:.3f}")
     print(f"Answer Relevancy: {mean_relev:.3f} ± {std_relev:.3f}")
     print(f"E2E Latency:    p50={p50_lat:.1f}s  p95={p95_lat:.1f}s")
+    print(f"Judge tokens:   avg {avg_pt:.0f} prompt + {avg_ct:.0f} completion per query")
+    print(f"Judge cost:     avg ${avg_cost:.5f}/query  total ${total_cost:.4f}")
 
     # ── Build markdown section ───────────────────────────────────────────────
 
     per_query_rows = ""
     for r in records:
         if "error" in r:
-            per_query_rows += f"| {r['query_id']} | ERROR | — | — | — |\n"
+            per_query_rows += f"| {r['query_id']} | ERROR | — | — | — | — |\n"
         else:
             g = "✓" if r.get("grounded") else "✗"
             per_query_rows += (
                 f"| {r['query_id']} | {g} "
                 f"| {r.get('faithfulness_score', 0):.2f} "
                 f"| {r.get('relevancy_score', 0):.2f} "
-                f"| {r.get('latency_s', 0):.1f}s |\n"
+                f"| {r.get('latency_s', 0):.1f}s "
+                f"| ${r.get('judge_cost_usd', 0):.5f} |\n"
             )
 
     gen_section = f"""## Generation Evaluation (RAGAS-style)
@@ -290,16 +332,54 @@ async def _run(sample: int) -> None:
 | Answer Relevancy (mean ± std) | {mean_relev:.3f} ± {std_relev:.3f} |
 | E2E Latency p50 | {p50_lat:.2f}s |
 | E2E Latency p95 | {p95_lat:.2f}s |
+| Judge prompt tokens (avg/query) | {avg_pt:.0f} |
+| Judge completion tokens (avg/query) | {avg_ct:.0f} |
+| Judge cost (avg/query) | ${avg_cost:.5f} |
+| Judge cost (total run) | ${total_cost:.4f} |
 
 ### Per-query breakdown
 
-| query_id | grounded | faithfulness | relevancy | latency |
-|----------|----------|--------------|-----------|---------|
+| query_id | grounded | faithfulness | relevancy | latency | judge_cost |
+|----------|----------|--------------|-----------|---------|------------|
 {per_query_rows}
 **Note**: Faithfulness scores are relative, not absolute — the LLM judge is not
 calibrated. Numbers above 0.7 indicate strong context grounding; below 0.4
 suggests the model is drawing on parametric knowledge beyond the retrieved chunks.
+Token costs cover judge calls only (llama-3.1-8b-instant); generation tokens
+(llama-3.3-70b-versatile) are tracked server-side via structured logs.
 """
+
+    # ── Write experiment_run row ─────────────────────────────────────────────
+    try:
+        from app.database import SessionLocal
+        from app.models.experiment_run import ExperimentRun
+        from app.config import settings as app_settings
+        _edb = SessionLocal()
+        try:
+            run_row = ExperimentRun(
+                eval_type="generation",
+                model=app_settings.groq_model,
+                prompt_version="v1",
+                retrieval_config={"mode": app_settings.retrieval_mode, "k": 5},
+                n_queries=len(eval_sample),
+                faithfulness=mean_faith if faith_scores else None,
+                answer_relevancy=mean_relev if relev_scores else None,
+                avg_latency_ms=statistics.mean(latencies) * 1000 if latencies else None,
+                p50_latency_ms=p50_lat * 1000,
+                p95_latency_ms=p95_lat * 1000,
+                avg_prompt_tokens=avg_pt,
+                avg_completion_tokens=avg_ct,
+                avg_cost_usd=avg_cost,
+                total_cost_usd=total_cost,
+                raw_results_path=str(RESULTS_PATH),
+            )
+            _edb.add(run_row)
+            _edb.commit()
+            print(f"Experiment run id={run_row.id} saved to experiment_runs table.")
+        finally:
+            _edb.close()
+    except Exception as exc:
+        print(f"WARN: could not write experiment_run row: {exc}")
 
     # Append to results.md
     if RESULTS_PATH.exists():

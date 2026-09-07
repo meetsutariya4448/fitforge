@@ -1,5 +1,6 @@
 # FitForge — AI Fitness Platform
 
+[![CI](https://github.com/meetsutariya4448/fitforge/actions/workflows/ci.yml/badge.svg)](https://github.com/meetsutariya4448/fitforge/actions/workflows/ci.yml)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-fitforge--six.vercel.app-brand?style=flat-square&color=10b981)](https://fitforge-six.vercel.app)
 [![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react)](https://react.dev)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com)
@@ -33,7 +34,8 @@ FitForge is a full-stack AI fitness platform that generates personalised weekly 
 
 ### Access
 - Demo account available instantly — no signup required
-- Full JWT-authenticated accounts with 24-hour tokens
+- Full JWT-authenticated accounts with 30-minute access tokens + 30-day rotating refresh tokens
+- Silent token refresh via Axios interceptor — users stay logged in without interruption
 
 ---
 
@@ -41,12 +43,14 @@ FitForge is a full-stack AI fitness platform that generates personalised weekly 
 
 | Layer | Technology |
 |-------|-----------|
-| **Frontend** | React 18, React Router v6, Tailwind CSS, Framer Motion, Recharts |
+| **Frontend** | React 18 + TypeScript, React Router v6, Tailwind CSS, Framer Motion, Recharts |
 | **Backend** | Python 3.11, FastAPI 0.111, SQLAlchemy 2.0 |
 | **Database** | PostgreSQL 16, Alembic migrations |
 | **AI** | Groq API — Llama 3.3 70B Versatile |
-| **Auth** | JWT (python-jose HS256), bcrypt password hashing |
+| **Auth** | JWT (python-jose HS256), bcrypt password hashing, atomically-rotated refresh tokens |
 | **Deployment** | Frontend → Vercel · Backend → Render |
+| **Validation** | zod schemas at the API boundary, checked against the FastAPI OpenAPI document in CI |
+| **Testing** | pytest · Vitest + React Testing Library · Playwright |
 | **DevOps** | Docker + docker-compose for local Postgres |
 
 ---
@@ -120,6 +124,92 @@ cd frontend && npm run dev  # frontend separately
 
 ---
 
+## Testing
+
+CI runs five jobs on every push. All must pass for the badge to go green:
+
+| Job | What it covers |
+|-----|----------------|
+| Unit tests | Retrieval, generation and agent logic; no database |
+| Integration tests | Real HTTP against real PostgreSQL, including refresh-token concurrency |
+| Frontend build | Typecheck, component tests, production build |
+| API contract | The frontend's zod schemas against the backend's OpenAPI document |
+| Browser tests | The critical user flows in Chromium |
+
+### Backend
+
+**Unit tests** — mock all external services; no database needed:
+```bash
+cd backend
+pytest tests/test_retrieval.py tests/test_generation.py tests/test_agent.py -v
+```
+
+**Integration tests** — hit real HTTP endpoints against a real PostgreSQL database:
+```bash
+cd backend
+# 1. Start Postgres (e.g. via docker compose up -d)
+# 2. Set DATABASE_URL, SECRET_KEY, GROQ_API_KEY in your environment or .env
+alembic upgrade head
+pytest tests/test_api.py tests/test_auth_concurrency.py -v
+```
+
+The integration suite covers auth (register, login, refresh, logout, delete
+account), authorization boundaries (user A cannot read user B's sessions or
+PRs), PR upsert boundary logic (strict greater-than), cursor pagination on
+`/history`, and Groq graceful-failure handling. The Groq client is
+monkeypatched — no live API calls are made and no API key is required.
+
+`test_auth_concurrency.py` covers refresh-token rotation under load. Its
+central test redeems one refresh token from eight threads simultaneously and
+asserts that exactly one replacement is minted. Against the previous
+read-then-write implementation it reports up to eight successes and eight live
+tokens; the rotation is now a single conditional `UPDATE`, so PostgreSQL row
+locking — not application logic — picks the winner. Losing that race is treated
+as a benign double-submit within a short grace window and as token theft after
+it, in which case the whole token family is revoked.
+
+### Frontend
+
+```bash
+cd frontend
+npm run typecheck      # tsc, strict
+npm run test           # Vitest + React Testing Library
+npm run test:e2e       # Playwright, against a stubbed API
+npm run check:contract -- openapi.json   # zod schemas vs. the backend
+```
+
+Browser tests stub the API at the network layer
+(`e2e/fixtures/api-stub.ts`), so they need no database and no Groq key — and
+can force failure modes a live server will not produce on request: a lost
+refresh-token race, a dropped connection, a 200 carrying the wrong shape.
+
+To drive the real stack instead, start the backend and dev server, then:
+
+```bash
+E2E_REAL_STACK=1 E2E_BASE_URL=http://localhost:5173 npx playwright test e2e/realstack.spec.ts
+```
+
+If the Playwright browser download fails on your network, `PLAYWRIGHT_CHANNEL=chrome`
+runs your installed Google Chrome instead.
+
+### Why runtime validation as well as TypeScript
+
+TypeScript describes what the frontend *expects*; it compiles away and checks
+nothing at runtime. A renamed backend field or a null where a number was
+promised would pass the type checker and surface as a crash somewhere
+unrelated. Every API response is therefore parsed through a zod schema
+(`src/schemas/api.ts`) at the client boundary, and `scripts/check-api-contract.mjs`
+compares those schemas against the backend's own OpenAPI document in CI, so
+drift fails the build instead of reaching users.
+
+### Usability testing
+
+Task scripts, observation guidance and the findings log live in
+[`docs/usability-testing.md`](docs/usability-testing.md). Findings there come
+from watching real people; nothing is extrapolated into a percentage.
+
+---
+
 ## Environment Variables
 
 ### Backend (`backend/.env`)
@@ -131,7 +221,10 @@ cd frontend && npm run dev  # frontend separately
 | `GROQ_API_KEY` | ✅ | API key from [console.groq.com](https://console.groq.com) |
 | `GROQ_MODEL` | | Model ID (default: `llama-3.3-70b-versatile`) |
 | `APP_ENV` | | `development` or `production` |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | | JWT lifetime in minutes (default: `1440`) |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | | Access token lifetime in minutes (default: `30`) |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | | Refresh token lifetime in days (default: `30`) |
+| `AGENT_MAX_ITERATIONS` | | Max refine cycles per agent request (default: `2`) |
+| `AGENT_CRITIQUE_THRESHOLD` | | Score ≥ this → plan accepted without refining (default: `0.75`) |
 
 ### Frontend (`frontend/.env`)
 
@@ -145,17 +238,128 @@ cd frontend && npm run dev  # frontend separately
 
 | Method | Route | Auth | Description |
 |--------|-------|------|-------------|
-| `POST` | `/api/auth/register` | — | Create account, returns JWT |
-| `POST` | `/api/auth/login` | — | Login, returns JWT |
+| `POST` | `/api/auth/register` | — | Create account, returns JWT + refresh token |
+| `POST` | `/api/auth/login` | — | Login, returns JWT + refresh token |
+| `POST` | `/api/auth/refresh` | — | Rotate refresh token, returns new JWT pair |
+| `POST` | `/api/auth/logout` | — | Revoke refresh token (server-side session end) |
 | `GET` | `/api/auth/me` | ✅ | Current user profile |
+| `DELETE` | `/api/auth/me` | ✅ | Delete account + purge all user data (password required) |
 | `POST` | `/api/workout/generate` | ✅ | AI plan generation + save to DB |
-| `GET` | `/api/workout/history` | ✅ | All saved plans for user |
+| `POST` | `/api/workout/generate-agent` | ✅ | Agent critique loop — generate + self-reflect + refine |
+| `GET` | `/api/workout/history` | ✅ | Saved plans, cursor-paginated (`?cursor=<id>&limit=20`) |
 | `POST` | `/api/sessions` | ✅ | Log workout session (auto-upserts PRs) |
 | `GET` | `/api/sessions` | ✅ | All sessions for user |
 | `GET` | `/api/sessions/exercise/{name}` | ✅ | Per-exercise strength trend data |
 | `GET` | `/api/sessions/{id}` | ✅ | Single session by ID |
 | `GET` | `/api/prs` | ✅ | All personal records for user |
 | `GET` | `/health` | — | Liveness probe |
+
+---
+
+## Agent — Self-Reflection Critique Loop
+
+`POST /api/workout/generate-agent` wraps the RAG pipeline in a LangGraph
+state machine that scores every generated plan and rewrites it if it falls
+short. The existing `/generate` endpoint is unchanged.
+
+### Graph shape
+
+```
+retrieve → generate → critique ──accepted──► return best plan
+                          └──rejected, budget left──► refine ──► critique (repeat)
+```
+
+Each node is a discrete step in the state machine:
+
+| Node | Model | What it does |
+|------|-------|-------------|
+| `retrieve` | — | RAG lookup (hybrid dense + sparse + RRF); sets `generation_mode` |
+| `generate` | 70B | Produces the initial JSON workout plan |
+| `critique` | 8B | Scores the plan 0–1 and lists constraint violations |
+| `refine` | 70B | Rewrites the plan with critic feedback prepended to context |
+
+The **highest-scoring plan seen across all iterations** is returned, not the
+last one. If the critic improves the plan in iteration 1 but then a parse
+error causes iteration 2 to fail open, the iteration-1 plan is still
+returned.
+
+### Why a separate endpoint?
+
+`/generate` is in production, has a stable contract, and its behaviour must
+not change for existing frontend clients. The agent adds latency (see cost
+below), changes the generation path, and is still being evaluated. A separate
+endpoint lets both co-exist and lets the eval harness compare them directly
+on identical inputs.
+
+### What the critic validates — and what it does not
+
+**Validates (profile constraint alignment):**
+- **equipment** — does the plan use equipment the user does not have?
+- **goal** — does the plan structure match the stated fitness goal?
+- **level** — is the intensity appropriate for the user's experience level?
+- **completeness** — is the plan sufficient for the number of training days?
+
+**Does not validate:**
+- **Factual grounding** — the critic never sees the retrieved KB chunks.
+  It cannot tell whether a claim like "4 sets of 8–12 reps" is supported by
+  the cited ACSM guidelines. Factual accuracy is the retrieval pipeline's job;
+  the critic only checks profile constraint alignment.
+
+Keep these two separate when describing the system. The critic is not a
+fact-checker.
+
+### Acceptance is computed in Python, not by the model
+
+The critic LLM returns a numeric `score` and a list of structured issues
+(each with a `category` field constrained to `{"goal", "equipment", "level",
+"completeness"}`). The `accepted` decision is computed in Python:
+
+```python
+equipment_violation = any(i["category"] == "equipment" for i in issues)
+accepted = (score >= AGENT_CRITIQUE_THRESHOLD) and not equipment_violation
+```
+
+The model is never asked to decide its own score or whether the plan should
+be accepted. This prevents the model from soft-pedalling a clear equipment
+violation by writing `"accepted": true` despite flagging it. It also makes
+the acceptance logic auditable and testable without LLM calls.
+
+### Configuration
+
+| Env variable | Default | Meaning |
+|---|---|---|
+| `AGENT_MAX_ITERATIONS` | `2` | Maximum refine cycles. `0` = generate + critique only, no refinement. |
+| `AGENT_CRITIQUE_THRESHOLD` | `0.75` | Score threshold for acceptance. Equipment violations block acceptance regardless of score. |
+
+### Worst-case LLM cost
+
+With `AGENT_MAX_ITERATIONS=2`, a plan that fails both critiques makes:
+- 1 × **generate** (70B)
+- 2 × **refine** (70B)
+- 3 × **critique** (8B)
+
+= **6 LLM calls total**. Wall-clock latency is logged per request
+(`run_agent complete: ... elapsed_ms=...`).
+
+### Eval results
+
+<!-- PLACEHOLDER — fill in after running `python -m scripts.eval_agent` -->
+
+| Metric | Value |
+|---|---|
+| Profiles | — |
+| Critic rejection rate (1st critique) | — |
+| Adversarial rejection rate | — |
+| Equipment violations | — |
+| Parse-error rate | — |
+| Runs that entered refine | — |
+| Refine improved best_score | — |
+| `/generate` p50 latency | — |
+| `/generate-agent` p50 latency | — |
+| Latency delta (p50) | — |
+
+_Run `python -m scripts.eval_agent --email <email> --password <pw> --log-file backend.log`
+from `backend/` to populate this table._
 
 ---
 
@@ -170,25 +374,38 @@ fitforge/
 │   │   ├── models/             # User, WorkoutPlanRecord, WorkoutSession, ExerciseLog, PersonalRecord
 │   │   ├── schemas/            # Pydantic request/response schemas
 │   │   ├── routers/            # auth, workout, sessions (+ prs)
-│   │   └── services/           # auth_service (JWT/bcrypt), claude_service (Groq)
+│   │   └── services/           # auth_service, ai_service (Groq), retrieval_service (RAG), agent_service (LangGraph)
 │   ├── alembic/versions/       # 3 migrations: plans, sessions/logs, personal_records
-│   ├── scripts/seed_demo.py    # Idempotent demo data seeder
+│   ├── scripts/
+│   │   ├── seed_demo.py        # Idempotent demo data seeder
+│   │   ├── eval_agent.py       # Eval harness: /generate vs /generate-agent
+│   │   └── eval_profiles.json  # 30 onboarding profiles (25 normal + 5 adversarial)
 │   ├── Dockerfile
 │   └── requirements.txt
 │
-├── frontend/src/
-│   ├── pages/                  # Home, Auth, Onboarding, WorkoutPlanPage, PlansHistory, Dashboard
-│   ├── components/
-│   │   ├── Navbar.jsx          # Shared responsive navbar (hamburger on mobile)
-│   │   ├── LogWorkoutModal.jsx # Sets/reps/weight logging modal
-│   │   ├── Toast.jsx           # Auto-dismiss notifications
-│   │   ├── onboarding/         # 5-step form wizard
-│   │   ├── workout/            # WorkoutPlan + DayCard
-│   │   └── ui/                 # Button, ProgressBar
-│   └── services/api.js         # Axios client + all API functions
+├── frontend/
+│   ├── src/
+│   │   ├── pages/              # Home, Auth, Onboarding, WorkoutPlanPage, PlansHistory, Dashboard
+│   │   ├── components/
+│   │   │   ├── Navbar.tsx      # Shared responsive navbar (hamburger on mobile)
+│   │   │   ├── RequireAuth.tsx # Route guard; waits for the stored session
+│   │   │   ├── LogWorkoutModal.tsx  # Sets/reps/weight logging modal
+│   │   │   ├── Toast.tsx       # Auto-dismiss notifications
+│   │   │   ├── onboarding/     # 5-step form wizard
+│   │   │   ├── workout/        # WorkoutPlan + DayCard
+│   │   │   └── ui/             # Button, ProgressBar
+│   │   ├── contexts/AuthContext.tsx  # Single source of truth for auth state
+│   │   ├── schemas/api.ts      # zod schemas — runtime validation + inferred types
+│   │   └── services/api.ts     # Axios client, silent refresh, error normalisation
+│   ├── e2e/                    # Playwright specs + the stubbed API they run against
+│   └── scripts/                # check-api-contract.mjs (zod ↔ OpenAPI, runs in CI)
 │
+├── docs/usability-testing.md   # Task scripts and findings log
 └── docker-compose.yml
 ```
+
+Dashboard is still `.jsx`: the TypeScript migration is incremental by design,
+and `allowJs` lets the remaining JavaScript coexist with the typed code.
 
 ---
 

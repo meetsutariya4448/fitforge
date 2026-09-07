@@ -52,8 +52,8 @@ class RetrievalResult:
 
 # ---------------------------------------------------------------------------
 # Lazy model singletons — loaded once per process, reused across requests.
-# Call _get_embed_model() / _get_reranker() in main.py lifespan to pre-load
-# and avoid ~30 s cold-start latency on the first plan generation request.
+# Models are initialised on first call; the first plan-generation request
+# after a cold boot pays the load cost (~5–15 s on CPU-only hosts).
 # ---------------------------------------------------------------------------
 
 _embed_model = None
@@ -235,7 +235,17 @@ def _sparse_search(
 # Fetch chunks by ID list (used after RRF to hydrate fused result set)
 # ---------------------------------------------------------------------------
 
-def _fetch_chunks_by_ids(db: Session, ids: list[int]) -> list[ChunkResult]:
+def _fetch_chunks_by_ids(
+    db: Session,
+    ids: list[int],
+    scores: dict[int, float] | None = None,
+) -> list[ChunkResult]:
+    """Hydrate chunk rows for a list of IDs, preserving the caller's ordering.
+
+    scores, if provided, is a mapping of chunk_id → fused RRF score.  Each
+    returned ChunkResult.score is set from that mapping (0.0 for missing IDs).
+    Passing scores=None leaves all scores at 0.0 (legacy behaviour).
+    """
     if not ids:
         return []
     sql = text("""
@@ -244,7 +254,7 @@ def _fetch_chunks_by_ids(db: Session, ids: list[int]) -> list[ChunkResult]:
         WHERE id = ANY(:ids)
     """)
     rows = db.execute(sql, {"ids": ids}).fetchall()
-    # Preserve the RRF-fused order (rows come back in DB order)
+    # Preserve the RRF-fused order (rows come back in DB storage order)
     row_map = {r.id: r for r in rows}
     return [
         ChunkResult(
@@ -252,7 +262,7 @@ def _fetch_chunks_by_ids(db: Session, ids: list[int]) -> list[ChunkResult]:
             raw_content=row_map[cid].raw_content,
             contextualized_content=row_map[cid].contextualized_content,
             metadata=row_map[cid].metadata,
-            score=0.0,
+            score=scores[cid] if (scores and cid in scores) else 0.0,
         )
         for cid in ids
         if cid in row_map
@@ -310,17 +320,19 @@ def _rerank(
 # Confidence threshold
 # ---------------------------------------------------------------------------
 
-def _is_low_confidence(top_score: float, candidate_count: int) -> bool:
-    """Return True when retrieval quality is below the configured threshold.
+def _is_low_confidence(top_score: float, candidate_count: int, threshold: float) -> bool:
+    """Return True when retrieval quality is below the given threshold.
 
-    The threshold (-2.0 default) is empirical: after running the Phase 4 eval,
-    plot top-1 cross-encoder score distributions for relevant vs irrelevant
-    queries and pick the crossing point.  Exposed as a config variable so it
-    can be tuned without redeployment.
+    threshold must match the score scale of the calling mode:
+      hybrid_rerank → settings.confidence_threshold  (cross-encoder logit scale, ~-10 to +10)
+      hybrid        → settings.rrf_confidence_threshold (RRF scale, ~0.010 to 0.033)
+
+    The two scales are incompatible; never pass confidence_threshold to a
+    hybrid call or rrf_confidence_threshold to a hybrid_rerank call.
     """
     if candidate_count == 0:
         return True
-    return top_score < settings.confidence_threshold
+    return top_score < threshold
 
 
 # ---------------------------------------------------------------------------
@@ -379,8 +391,10 @@ def retrieve(
             [c.chunk_id for c in dense_results],
             [c.chunk_id for c in sparse_results],
         )
-        fused_ids = [cid for cid, _ in fused[:20]]
-        candidates = _fetch_chunks_by_ids(db, fused_ids)
+        fused_top = fused[:20]
+        fused_ids = [cid for cid, _ in fused_top]
+        fused_score_map = dict(fused_top)
+        candidates = _fetch_chunks_by_ids(db, fused_ids, scores=fused_score_map)
 
     # ── Reranking + confidence ────────────────────────────────────────────────
     if mode == "hybrid_rerank":
@@ -392,13 +406,24 @@ def retrieve(
             chunk.score = score
         # Check confidence even on empty candidate set — no hits → low confidence
         low_conf = _is_low_confidence(
-            final_scores[0] if final_scores else -999.0, len(final_chunks)
+            final_scores[0] if final_scores else -999.0,
+            len(final_chunks),
+            settings.confidence_threshold,
         )
     else:
         final_chunks = candidates[:k]
         final_scores = [c.score for c in final_chunks]
-        # No reliable scalar score for non-reranked modes — always confident
-        low_conf = False
+        if mode == "hybrid":
+            # Gate on fused RRF score now that fix 2 makes it available.
+            # sparse_only / dense_only lack a calibrated scalar so remain
+            # always-confident (their scores are FTS ranks / cosine sims,
+            # incompatible with rrf_confidence_threshold).
+            top_rrf = final_scores[0] if final_scores else 0.0
+            low_conf = _is_low_confidence(
+                top_rrf, len(final_chunks), settings.rrf_confidence_threshold
+            )
+        else:
+            low_conf = False
 
     return RetrievalResult(
         chunks=final_chunks,

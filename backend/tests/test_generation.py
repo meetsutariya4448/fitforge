@@ -76,6 +76,7 @@ class FakeCompletion:
     """Mimics the minimal shape of a Groq chat completion response."""
     def __init__(self, content):
         self.choices = [type("C", (), {"message": type("M", (), {"content": content})()})()]
+        self.usage = None  # ai_service.py guards with `if completion.usage`
 
 
 def _make_fake_groq(plan_dict):
