@@ -56,7 +56,10 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16
+        # pgvector image, not plain postgres:16 — the kb_chunks migration runs
+        # CREATE EXTENSION vector, which the stock image cannot satisfy.
+        # Same image docker-compose.yml uses for local development.
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_DB: fitforge_test
           POSTGRES_USER: ci
@@ -96,7 +99,7 @@ jobs:
         run: alembic upgrade head
 
       - name: Run integration tests
-        run: python -m pytest tests/test_api.py -v --tb=short
+        run: python -m pytest tests/test_api.py tests/test_auth_concurrency.py -v --tb=short
 
   # ── Job 3: Frontend build ──────────────────────────────────────────────────────
   frontend-build:

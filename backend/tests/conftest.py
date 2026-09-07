@@ -18,6 +18,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base, get_db
+from app.limiter import limiter
 from app.main import app
 from app.services.retrieval_service import ChunkResult
 
@@ -166,9 +167,40 @@ def _api_engine():
         pytest.skip("DATABASE_URL not set — skipping API integration tests")
     engine = create_engine(DATABASE_URL)
     # Idempotent: alembic upgrade head already ran in CI; this is a no-op there.
-    Base.metadata.create_all(bind=engine)
+    #
+    # kb_chunks is excluded because its vector(384) columns need the pgvector
+    # extension, which a plain local PostgreSQL will not have.  No integration
+    # test reads or writes it (retrieval is monkeypatched in mock_groq), so
+    # skipping it lets the suite run locally without a pgvector build.
+    tables = [t for t in Base.metadata.sorted_tables if t.name != "kb_chunks"]
+    Base.metadata.create_all(bind=engine, tables=tables)
     yield engine
     engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def _no_rate_limit():
+    """Disable rate limiting for the duration of each test.
+
+    Register and login are capped at 10/minute per client IP.  Every test
+    creates its own account, so past the tenth test in a run the suite starts
+    getting 429s and fails wholesale — the limiter counts all of them as one
+    caller.  Tests that mean to exercise the limiter opt back in via the
+    `rate_limited` fixture below.
+    """
+    limiter.enabled = False
+    yield
+    limiter.enabled = True
+
+
+@pytest.fixture
+def rate_limited():
+    """Re-enable rate limiting, with counters reset, for tests that assert on it."""
+    limiter.reset()
+    limiter.enabled = True
+    yield limiter
+    limiter.enabled = False
+    limiter.reset()
 
 
 @pytest.fixture

@@ -28,13 +28,85 @@ apiClient.interceptors.request.use((config) => {
 // access token. On failure (missing/expired refresh token), clear storage
 // and redirect to /auth.
 
-let _refreshPromise = null  // serialise concurrent refresh attempts
+let _refreshPromise = null  // serialise concurrent refresh attempts in THIS tab
+
+const TOKEN_KEY = 'fitforge_token'
+const REFRESH_KEY = 'fitforge_refresh_token'
+const USER_KEY = 'fitforge_user'
+
+// How long to wait for another tab to finish rotating before giving up.
+const SIBLING_ROTATION_TIMEOUT_MS = 3000
+const SIBLING_POLL_INTERVAL_MS = 50
 
 function _clearSession() {
-  localStorage.removeItem('fitforge_token')
-  localStorage.removeItem('fitforge_refresh_token')
-  localStorage.removeItem('fitforge_user')
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(REFRESH_KEY)
+  localStorage.removeItem(USER_KEY)
   if (window.location.pathname !== '/auth') window.location.href = '/auth'
+}
+
+function _storeSession(data) {
+  localStorage.setItem(TOKEN_KEY, data.access_token)
+  localStorage.setItem(REFRESH_KEY, data.refresh_token)
+  if (data.user) localStorage.setItem(USER_KEY, JSON.stringify(data.user))
+}
+
+/**
+ * Wait for another tab to finish rotating the refresh token.
+ *
+ * _refreshPromise only serialises within one tab. Two tabs hold the same
+ * refresh token in shared localStorage, so both can redeem it at once — and
+ * the server, which now rotates atomically, lets exactly one win. The loser
+ * gets 401 REFRESH_RACE, which means "your session is fine, someone else
+ * rotated first". Recovering is a matter of waiting for the winner to write
+ * the new token to localStorage rather than tearing the session down.
+ *
+ * Resolves with the fresh access token, or null if nothing arrived in time.
+ */
+function _awaitSiblingRotation(sentRefreshToken) {
+  return new Promise((resolve) => {
+    const deadline = Date.now() + SIBLING_ROTATION_TIMEOUT_MS
+    const check = () => {
+      const current = localStorage.getItem(REFRESH_KEY)
+      // A different refresh token than the one we sent means the winning tab
+      // has already stored its replacement.
+      if (current && current !== sentRefreshToken) {
+        resolve(localStorage.getItem(TOKEN_KEY))
+        return
+      }
+      if (Date.now() >= deadline) {
+        resolve(null)
+        return
+      }
+      setTimeout(check, SIBLING_POLL_INTERVAL_MS)
+    }
+    check()
+  })
+}
+
+function _errorCode(error) {
+  return error?.response?.data?.error?.code
+}
+
+/**
+ * Redeem the stored refresh token for a new pair. Returns the new access
+ * token. Throws if the session is genuinely over.
+ */
+async function _performRefresh() {
+  const sent = localStorage.getItem(REFRESH_KEY)
+  try {
+    const { data } = await apiClient.post('/api/auth/refresh', { refresh_token: sent })
+    _storeSession(data)
+    return data.access_token
+  } catch (error) {
+    if (_errorCode(error) === 'REFRESH_RACE') {
+      const token = await _awaitSiblingRotation(sent)
+      if (token) return token
+    }
+    // REFRESH_REUSE, REFRESH_EXPIRED, REFRESH_INVALID, or a race whose winner
+    // never landed — the session really is over.
+    throw error
+  }
 }
 
 apiClient.interceptors.response.use(
@@ -51,8 +123,7 @@ apiClient.interceptors.response.use(
     ) {
       originalRequest._retry = true
 
-      const refreshToken = localStorage.getItem('fitforge_refresh_token')
-      if (!refreshToken) {
+      if (!localStorage.getItem(REFRESH_KEY)) {
         _clearSession()
         return Promise.reject(error)
       }
@@ -61,18 +132,13 @@ apiClient.interceptors.response.use(
         // Serialise: if multiple requests 401 simultaneously, only one
         // refresh call is made; others wait for the same promise.
         if (!_refreshPromise) {
-          _refreshPromise = apiClient
-            .post('/api/auth/refresh', { refresh_token: refreshToken })
-            .finally(() => { _refreshPromise = null })
+          _refreshPromise = _performRefresh().finally(() => { _refreshPromise = null })
         }
 
-        const { data } = await _refreshPromise
-        localStorage.setItem('fitforge_token', data.access_token)
-        localStorage.setItem('fitforge_refresh_token', data.refresh_token)
-        if (data.user) localStorage.setItem('fitforge_user', JSON.stringify(data.user))
+        const accessToken = await _refreshPromise
 
         // Retry original request with the new access token.
-        originalRequest.headers.Authorization = `Bearer ${data.access_token}`
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`
         return apiClient(originalRequest)
       } catch {
         _clearSession()

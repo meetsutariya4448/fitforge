@@ -12,7 +12,6 @@ from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
@@ -58,7 +57,6 @@ app = FastAPI(
 )
 
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ── Structured error responses ────────────────────────────────────────────────
 
@@ -83,13 +81,41 @@ _HTTP_CODE_MAP = {
 
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    code = _HTTP_CODE_MAP.get(exc.status_code, f"HTTP_{exc.status_code}")
+    # An exception may carry a more specific code than the status alone implies
+    # (e.g. REFRESH_RACE vs REFRESH_REUSE, both 401) — prefer it when present so
+    # clients can branch on the reason rather than parsing the message.
+    code = getattr(exc, "error_code", None) or _HTTP_CODE_MAP.get(
+        exc.status_code, f"HTTP_{exc.status_code}"
+    )
     body: dict = {"error": {"code": code, "message": exc.detail or ""}}
     if exc.status_code == 429:
         retry_after = exc.headers.get("Retry-After") if exc.headers else None
         if retry_after:
             body["error"]["retry_after"] = int(retry_after)
-    return JSONResponse(status_code=exc.status_code, content=body)
+    # Headers set on the exception must survive: dropping them silently stripped
+    # WWW-Authenticate from every 401, which RFC 7235 requires on that status.
+    return JSONResponse(status_code=exc.status_code, content=body, headers=exc.headers)
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    """Rate-limit rejections, in the same envelope as every other error.
+
+    slowapi's stock handler answers with {"error": "<string>"} while the rest of
+    the API answers with {"error": {"code", "message"}}.  A client cannot parse
+    both shapes with one schema, so this re-wraps it — and still runs slowapi's
+    header injection so Retry-After / X-RateLimit-* survive.
+    """
+    response = JSONResponse(
+        status_code=429,
+        content={
+            "error": {
+                "code": "RATE_LIMITED",
+                "message": f"Rate limit exceeded: {exc.detail}",
+            }
+        },
+    )
+    return limiter._inject_headers(response, request.state.view_rate_limit)
 
 
 @app.exception_handler(RequestValidationError)
