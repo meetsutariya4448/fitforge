@@ -43,12 +43,14 @@ FitForge is a full-stack AI fitness platform that generates personalised weekly 
 
 | Layer | Technology |
 |-------|-----------|
-| **Frontend** | React 18, React Router v6, Tailwind CSS, Framer Motion, Recharts |
+| **Frontend** | React 18 + TypeScript, React Router v6, Tailwind CSS, Framer Motion, Recharts |
 | **Backend** | Python 3.11, FastAPI 0.111, SQLAlchemy 2.0 |
 | **Database** | PostgreSQL 16, Alembic migrations |
 | **AI** | Groq API — Llama 3.3 70B Versatile |
-| **Auth** | JWT (python-jose HS256), bcrypt password hashing |
+| **Auth** | JWT (python-jose HS256), bcrypt password hashing, atomically-rotated refresh tokens |
 | **Deployment** | Frontend → Vercel · Backend → Render |
+| **Validation** | zod schemas at the API boundary, checked against the FastAPI OpenAPI document in CI |
+| **Testing** | pytest · Vitest + React Testing Library · Playwright |
 | **DevOps** | Docker + docker-compose for local Postgres |
 
 ---
@@ -124,7 +126,17 @@ cd frontend && npm run dev  # frontend separately
 
 ## Testing
 
-CI runs three jobs on every push — unit tests, integration tests (real Postgres), and a frontend build. All three must pass for the badge to go green.
+CI runs five jobs on every push. All must pass for the badge to go green:
+
+| Job | What it covers |
+|-----|----------------|
+| Unit tests | Retrieval, generation and agent logic; no database |
+| Integration tests | Real HTTP against real PostgreSQL, including refresh-token concurrency |
+| Frontend build | Typecheck, component tests, production build |
+| API contract | The frontend's zod schemas against the backend's OpenAPI document |
+| Browser tests | The critical user flows in Chromium |
+
+### Backend
 
 **Unit tests** — mock all external services; no database needed:
 ```bash
@@ -138,10 +150,63 @@ cd backend
 # 1. Start Postgres (e.g. via docker compose up -d)
 # 2. Set DATABASE_URL, SECRET_KEY, GROQ_API_KEY in your environment or .env
 alembic upgrade head
-pytest tests/test_api.py -v
+pytest tests/test_api.py tests/test_auth_concurrency.py -v
 ```
 
-The integration suite covers: auth (register, login, refresh, logout, delete account), authorization boundaries (user A cannot read user B's sessions or PRs), PR upsert boundary logic (strict greater-than), cursor pagination on `/history`, and Groq graceful-failure handling. The Groq client is monkeypatched — no live API calls are made and no API key is required.
+The integration suite covers auth (register, login, refresh, logout, delete
+account), authorization boundaries (user A cannot read user B's sessions or
+PRs), PR upsert boundary logic (strict greater-than), cursor pagination on
+`/history`, and Groq graceful-failure handling. The Groq client is
+monkeypatched — no live API calls are made and no API key is required.
+
+`test_auth_concurrency.py` covers refresh-token rotation under load. Its
+central test redeems one refresh token from eight threads simultaneously and
+asserts that exactly one replacement is minted. Against the previous
+read-then-write implementation it reports up to eight successes and eight live
+tokens; the rotation is now a single conditional `UPDATE`, so PostgreSQL row
+locking — not application logic — picks the winner. Losing that race is treated
+as a benign double-submit within a short grace window and as token theft after
+it, in which case the whole token family is revoked.
+
+### Frontend
+
+```bash
+cd frontend
+npm run typecheck      # tsc, strict
+npm run test           # Vitest + React Testing Library
+npm run test:e2e       # Playwright, against a stubbed API
+npm run check:contract -- openapi.json   # zod schemas vs. the backend
+```
+
+Browser tests stub the API at the network layer
+(`e2e/fixtures/api-stub.ts`), so they need no database and no Groq key — and
+can force failure modes a live server will not produce on request: a lost
+refresh-token race, a dropped connection, a 200 carrying the wrong shape.
+
+To drive the real stack instead, start the backend and dev server, then:
+
+```bash
+E2E_REAL_STACK=1 E2E_BASE_URL=http://localhost:5173 npx playwright test e2e/realstack.spec.ts
+```
+
+If the Playwright browser download fails on your network, `PLAYWRIGHT_CHANNEL=chrome`
+runs your installed Google Chrome instead.
+
+### Why runtime validation as well as TypeScript
+
+TypeScript describes what the frontend *expects*; it compiles away and checks
+nothing at runtime. A renamed backend field or a null where a number was
+promised would pass the type checker and surface as a crash somewhere
+unrelated. Every API response is therefore parsed through a zod schema
+(`src/schemas/api.ts`) at the client boundary, and `scripts/check-api-contract.mjs`
+compares those schemas against the backend's own OpenAPI document in CI, so
+drift fails the build instead of reaching users.
+
+### Usability testing
+
+Task scripts, observation guidance and the findings log live in
+[`docs/usability-testing.md`](docs/usability-testing.md). Findings there come
+from watching real people; nothing is extrapolated into a percentage.
 
 ---
 
@@ -318,19 +383,29 @@ fitforge/
 │   ├── Dockerfile
 │   └── requirements.txt
 │
-├── frontend/src/
-│   ├── pages/                  # Home, Auth, Onboarding, WorkoutPlanPage, PlansHistory, Dashboard
-│   ├── components/
-│   │   ├── Navbar.jsx          # Shared responsive navbar (hamburger on mobile)
-│   │   ├── LogWorkoutModal.jsx # Sets/reps/weight logging modal
-│   │   ├── Toast.jsx           # Auto-dismiss notifications
-│   │   ├── onboarding/         # 5-step form wizard
-│   │   ├── workout/            # WorkoutPlan + DayCard
-│   │   └── ui/                 # Button, ProgressBar
-│   └── services/api.js         # Axios client + all API functions
+├── frontend/
+│   ├── src/
+│   │   ├── pages/              # Home, Auth, Onboarding, WorkoutPlanPage, PlansHistory, Dashboard
+│   │   ├── components/
+│   │   │   ├── Navbar.tsx      # Shared responsive navbar (hamburger on mobile)
+│   │   │   ├── RequireAuth.tsx # Route guard; waits for the stored session
+│   │   │   ├── LogWorkoutModal.tsx  # Sets/reps/weight logging modal
+│   │   │   ├── Toast.tsx       # Auto-dismiss notifications
+│   │   │   ├── onboarding/     # 5-step form wizard
+│   │   │   ├── workout/        # WorkoutPlan + DayCard
+│   │   │   └── ui/             # Button, ProgressBar
+│   │   ├── contexts/AuthContext.tsx  # Single source of truth for auth state
+│   │   ├── schemas/api.ts      # zod schemas — runtime validation + inferred types
+│   │   └── services/api.ts     # Axios client, silent refresh, error normalisation
+│   ├── e2e/                    # Playwright specs + the stubbed API they run against
+│   └── scripts/                # check-api-contract.mjs (zod ↔ OpenAPI, runs in CI)
 │
+├── docs/usability-testing.md   # Task scripts and findings log
 └── docker-compose.yml
 ```
+
+Dashboard is still `.jsx`: the TypeScript migration is incremental by design,
+and `allowJs` lets the remaining JavaScript coexist with the typed code.
 
 ---
 
