@@ -12,42 +12,51 @@ import {
 } from 'recharts'
 import Button from '../components/ui/Button'
 import Navbar from '../components/Navbar'
-import { getWorkoutSessions, getPRs, getExerciseTrend } from '../services/api'
+import { getWorkoutSessions, getPRs, getExerciseTrend, toApiError } from '../services/api'
 
 export default function Dashboard() {
   const navigate = useNavigate()
   const [sessions, setSessions] = useState([])
   const [prs, setPRs] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(null)
   const [expandedSession, setExpandedSession] = useState(null)
 
   // Strength trend state
   const [trendExercise, setTrendExercise] = useState('')
   const [trendData, setTrendData] = useState(null)
   const [trendLoading, setTrendLoading] = useState(false)
+  const [trendError, setTrendError] = useState(null)
 
   useEffect(() => {
     document.title = 'FitForge — Dashboard'
-    if (!localStorage.getItem('fitforge_token')) {
-      navigate('/auth', { replace: true })
-      return
-    }
+    // The auth guard now lives in RequireAuth (App.tsx).
     Promise.all([getWorkoutSessions(), getPRs()])
       .then(([sess, prList]) => {
-        setSessions(Array.isArray(sess) ? sess : [])
-        setPRs(Array.isArray(prList) ? prList : [])
+        setSessions(sess)
+        setPRs(prList)
+        setLoadError(null)
       })
-      .catch(() => { setSessions([]); setPRs([]) })
+      .catch((err) => {
+        // Swallowing this used to render an empty dashboard, which is exactly
+        // what a brand-new account looks like — so a network failure read as
+        // "you have logged nothing", and the encouraging empty state told the
+        // user to start training when their data was simply unreachable.
+        const apiError = toApiError(err)
+        setSessions([])
+        setPRs([])
+        if (apiError.status !== 401) setLoadError(apiError.message)
+      })
       .finally(() => setLoading(false))
-  }, [navigate])
+  }, [])
 
   // Fetch trend when exercise selection changes
   useEffect(() => {
-    if (!trendExercise) { setTrendData(null); return }
+    if (!trendExercise) { setTrendData(null); setTrendError(null); return }
     setTrendLoading(true)
     getExerciseTrend(trendExercise)
-      .then((res) => setTrendData(res))
-      .catch(() => setTrendData(null))
+      .then((res) => { setTrendData(res); setTrendError(null) })
+      .catch((err) => { setTrendData(null); setTrendError(toApiError(err).message) })
       .finally(() => setTrendLoading(false))
   }, [trendExercise])
 
@@ -145,8 +154,26 @@ export default function Dashboard() {
         </motion.div>
 
         {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="w-10 h-10 border-4 border-gray-700 border-t-brand-500 rounded-full animate-spin" />
+          <div className="flex justify-center py-20" role="status" aria-live="polite">
+            <div
+              aria-hidden="true"
+              className="w-10 h-10 border-4 border-gray-700 border-t-brand-500 rounded-full animate-spin"
+            />
+            <span className="sr-only">Loading your dashboard</span>
+          </div>
+        ) : loadError ? (
+          <div
+            role="alert"
+            className="card p-8 text-center flex flex-col items-center gap-4"
+          >
+            <p className="text-red-300 text-sm">{loadError}</p>
+            <p className="text-gray-500 text-xs max-w-sm">
+              Your workout history could not be loaded, so nothing is shown below.
+              This is a loading problem, not lost data.
+            </p>
+            <Button size="sm" onClick={() => window.location.reload()}>
+              Try again
+            </Button>
           </div>
         ) : sessions.length === 0 ? (
           <div className="card p-10 sm:p-12 text-center">
@@ -278,9 +305,19 @@ export default function Dashboard() {
               {!trendExercise ? (
                 <p className="text-gray-600 text-sm text-center py-6">Select an exercise above to see your strength trend.</p>
               ) : trendLoading ? (
-                <div className="flex justify-center py-8">
-                  <div className="w-8 h-8 border-4 border-gray-700 border-t-brand-500 rounded-full animate-spin" />
+                <div className="flex justify-center py-8" role="status" aria-live="polite">
+                  <div
+                    aria-hidden="true"
+                    className="w-8 h-8 border-4 border-gray-700 border-t-brand-500 rounded-full animate-spin"
+                  />
+                  <span className="sr-only">Loading strength trend</span>
                 </div>
+              ) : trendError ? (
+                // Distinct from "not enough data": the chart is missing because
+                // the request failed, and logging more sessions will not help.
+                <p role="alert" className="text-red-300 text-sm text-center py-6">
+                  {trendError}
+                </p>
               ) : !trendData || trendChartData.length < 2 ? (
                 <p className="text-gray-500 text-sm text-center py-6">
                   Log at least 2 sessions with <span className="text-white">{trendExercise}</span> to see your trend.

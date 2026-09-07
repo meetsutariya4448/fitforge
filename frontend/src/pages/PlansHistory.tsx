@@ -1,28 +1,38 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Dumbbell, Calendar, Target, BarChart2, Clock, ArrowRight, Plus } from 'lucide-react'
+import {
+  Dumbbell,
+  Calendar,
+  Target,
+  BarChart2,
+  Clock,
+  ArrowRight,
+  Plus,
+  AlertTriangle,
+} from 'lucide-react'
 import { motion } from 'framer-motion'
+
 import Button from '../components/ui/Button'
 import Navbar from '../components/Navbar'
-import { getWorkoutHistory } from '../services/api'
+import { getWorkoutHistory, toApiError } from '../services/api'
+import {
+  workoutPlanSchema,
+  type WorkoutPlan,
+  type WorkoutPlanHistoryItem,
+} from '../schemas/api'
 
 // ── Formatting helpers ────────────────────────────────────────────────────────
 
-/**
- * Convert a snake_case enum string to Title Case.
- * e.g. "build_muscle" → "Build Muscle"
- */
-function formatLabel(value) {
+/** Convert a snake_case enum string to Title Case: "build_muscle" → "Build Muscle". */
+function formatLabel(value: string): string {
   return value
     .split('_')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ')
 }
 
-/**
- * Format an ISO date string as "Apr 1, 2026".
- */
-function formatDate(isoString) {
+/** Format an ISO date string as "Apr 1, 2026". */
+function formatDate(isoString: string): string {
   return new Date(isoString).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -35,16 +45,20 @@ function formatDate(isoString) {
 /**
  * A single plan card in the history grid.
  *
- * @param {Object} plan   - History item from the API
- * @param {number} index  - Used for staggered entrance animation
+ * `plan_json` is a stored blob, possibly written by an older version of the app,
+ * so it is parsed rather than assumed. A row that no longer matches the current
+ * plan shape renders as an unopenable card instead of taking the whole page down
+ * with it — one bad historical row should not cost the user the other nine.
  */
-function PlanCard({ plan, index }) {
+function PlanCard({ plan, index }: { plan: WorkoutPlanHistoryItem; index: number }) {
   const navigate = useNavigate()
+  const parsed = workoutPlanSchema.safeParse(plan.plan_json)
+  const planData: WorkoutPlan | null = parsed.success ? parsed.data : null
 
-  const handleViewPlan = () => {
-    // Pass plan_json as router state — WorkoutPlanPage reads location.state.plan,
-    // so this is identical to the shape set by the onboarding flow.
-    navigate('/plan', { state: { plan: plan.plan_json } })
+  const handleViewPlan = (): void => {
+    // WorkoutPlanPage reads location.state.plan, so this matches the shape the
+    // onboarding flow sets.
+    navigate('/plan', { state: { plan: planData } })
   }
 
   return (
@@ -57,19 +71,29 @@ function PlanCard({ plan, index }) {
       {/* ── Plan title ── */}
       <div>
         <h3 className="font-semibold text-white text-base leading-snug line-clamp-2">
-          {plan.plan_json.title}
+          {planData?.title ?? 'Unavailable plan'}
         </h3>
       </div>
 
       {/* ── Metadata pills ── */}
       <div className="flex flex-wrap gap-2">
         <MetaPill icon={<Target className="w-3.5 h-3.5" />} label={formatLabel(plan.goal)} />
-        <MetaPill icon={<BarChart2 className="w-3.5 h-3.5" />} label={formatLabel(plan.fitness_level)} />
+        <MetaPill
+          icon={<BarChart2 className="w-3.5 h-3.5" />}
+          label={formatLabel(plan.fitness_level)}
+        />
         <MetaPill
           icon={<Clock className="w-3.5 h-3.5" />}
           label={`${plan.days_per_week} day${plan.days_per_week !== 1 ? 's' : ''} / week`}
         />
       </div>
+
+      {!planData && (
+        <p className="flex items-start gap-2 text-xs text-amber-400">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+          This plan was saved in an older format and can no longer be opened.
+        </p>
+      )}
 
       {/* ── Footer: date + action ── */}
       <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-800">
@@ -77,7 +101,7 @@ function PlanCard({ plan, index }) {
           <Calendar className="w-3.5 h-3.5" />
           {formatDate(plan.created_at)}
         </span>
-        <Button size="sm" onClick={handleViewPlan}>
+        <Button size="sm" onClick={handleViewPlan} disabled={!planData}>
           View Plan
           <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
         </Button>
@@ -87,7 +111,7 @@ function PlanCard({ plan, index }) {
 }
 
 /** Small icon + text pill used in the plan card metadata row. */
-function MetaPill({ icon, label }) {
+function MetaPill({ icon, label }: { icon: ReactNode; label: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 bg-gray-800 text-gray-400 text-xs px-2.5 py-1 rounded-lg">
       {icon}
@@ -96,11 +120,18 @@ function MetaPill({ icon, label }) {
   )
 }
 
-/** Full-page loading spinner, matches the style used in Onboarding.jsx. */
+/** Full-page loading spinner, matching the style used in Onboarding. */
 function LoadingState() {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-4 py-32">
-      <div className="w-10 h-10 border-4 border-gray-700 border-t-brand-500 rounded-full animate-spin" />
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex-1 flex flex-col items-center justify-center gap-4 py-32"
+    >
+      <div
+        aria-hidden="true"
+        className="w-10 h-10 border-4 border-gray-700 border-t-brand-500 rounded-full animate-spin"
+      />
       <p className="text-gray-400 text-sm">Loading your plans…</p>
     </div>
   )
@@ -136,29 +167,42 @@ function EmptyState() {
 /**
  * My Plans history page — shows all saved workout plans for the current user.
  *
- * Auth guard: if no JWT is found in localStorage, redirect to / immediately.
- * The Axios interceptor handles token expiry (clears localStorage on 401),
- * so a missing token here means the user is not logged in.
+ * The auth guard now lives in RequireAuth (App.tsx) rather than a local
+ * useEffect redirect.
  */
 export default function PlansHistory() {
   const navigate = useNavigate()
-  const [plans, setPlans] = useState([])
+  const [plans, setPlans] = useState<WorkoutPlanHistoryItem[]>([])
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     document.title = 'FitForge — My Plans'
-    const token = localStorage.getItem('fitforge_token')
-    if (!token) { navigate('/auth', { replace: true }); return }
+
+    let cancelled = false
 
     getWorkoutHistory()
-      .then(({ plans, total }) => { setPlans(plans); setTotal(total) })
-      .catch((err) => {
-        if (err.response?.status !== 401) setError('Could not load your plans. Please try again.')
+      .then((history) => {
+        if (cancelled) return
+        setPlans(history.plans)
+        setTotal(history.total)
       })
-      .finally(() => setIsLoading(false))
-  }, [navigate])
+      .catch((err: unknown) => {
+        if (cancelled) return
+        const apiError = toApiError(err)
+        // A 401 means the interceptor is already redirecting to /auth; showing
+        // an error under a page that is about to unmount just adds noise.
+        if (apiError.status !== 401) setError(apiError.message)
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
@@ -168,7 +212,9 @@ export default function PlansHistory() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white mb-1">My Plans</h1>
           {!isLoading && total > 0 && (
-            <p className="text-gray-400 text-sm">{total} plan{total !== 1 ? 's' : ''} generated</p>
+            <p className="text-gray-400 text-sm">
+              {total} plan{total !== 1 ? 's' : ''} generated
+            </p>
           )}
         </div>
         <Button size="sm" onClick={() => navigate('/onboarding')}>
@@ -178,7 +224,12 @@ export default function PlansHistory() {
 
       {error && (
         <div className="max-w-5xl mx-auto w-full px-4 sm:px-6 mb-4">
-          <div className="bg-red-950/50 border border-red-800 text-red-300 rounded-xl px-4 py-3 text-sm">{error}</div>
+          <div
+            role="alert"
+            className="bg-red-950/50 border border-red-800 text-red-300 rounded-xl px-4 py-3 text-sm"
+          >
+            {error}
+          </div>
         </div>
       )}
 
@@ -189,7 +240,9 @@ export default function PlansHistory() {
           <EmptyState />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {plans.map((plan, index) => <PlanCard key={plan.id} plan={plan} index={index} />)}
+            {plans.map((plan, index) => (
+              <PlanCard key={plan.id} plan={plan} index={index} />
+            ))}
           </div>
         )}
       </div>

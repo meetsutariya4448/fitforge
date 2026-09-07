@@ -1,10 +1,14 @@
 /**
  * Animated progress bar used in the onboarding flow.
- *
- * @param {number} value     - 0–100
- * @param {string} className - Extra Tailwind classes for the wrapper
  */
-export default function ProgressBar({ value, className = '' }) {
+export interface ProgressBarProps {
+  /** Percentage complete, 0–100. Values outside the range are clamped. */
+  value: number
+  /** Extra Tailwind classes for the wrapper. */
+  className?: string
+}
+
+export default function ProgressBar({ value, className = '' }: ProgressBarProps) {
   const clamped = Math.min(100, Math.max(0, value))
 
   return (

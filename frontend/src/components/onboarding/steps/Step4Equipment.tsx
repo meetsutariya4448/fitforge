@@ -1,37 +1,46 @@
 import { Check } from 'lucide-react'
 
-const EQUIPMENT_OPTIONS = [
-  { value: 'no_equipment',    label: 'No Equipment',      emoji: '🏠', description: 'Bodyweight only' },
-  { value: 'dumbbells',       label: 'Dumbbells',         emoji: '🏋️', description: 'Fixed or adjustable' },
-  { value: 'barbell',         label: 'Barbell',           emoji: '🔩', description: 'With weight plates' },
+import type { Equipment } from '../../../schemas/api'
+import type { StepProps } from '../types'
+
+interface EquipmentOption {
+  value: Equipment
+  label: string
+  emoji: string
+  description: string
+}
+
+const EQUIPMENT_OPTIONS: EquipmentOption[] = [
+  { value: 'no_equipment',     label: 'No Equipment',     emoji: '🏠', description: 'Bodyweight only' },
+  { value: 'dumbbells',        label: 'Dumbbells',        emoji: '🏋️', description: 'Fixed or adjustable' },
+  { value: 'barbell',          label: 'Barbell',          emoji: '🔩', description: 'With weight plates' },
   { value: 'resistance_bands', label: 'Resistance Bands', emoji: '🟡', description: 'Light to heavy bands' },
-  { value: 'pull_up_bar',     label: 'Pull-up Bar',       emoji: '🔝', description: 'Doorframe or wall mounted' },
-  { value: 'kettlebell',      label: 'Kettlebell',        emoji: '⚫', description: 'Single or multiple' },
-  { value: 'full_gym',        label: 'Full Gym',          emoji: '🏟️', description: 'Access to all machines' },
+  { value: 'pull_up_bar',      label: 'Pull-up Bar',      emoji: '🔝', description: 'Doorframe or wall mounted' },
+  { value: 'kettlebell',       label: 'Kettlebell',       emoji: '⚫', description: 'Single or multiple' },
+  { value: 'full_gym',         label: 'Full Gym',         emoji: '🏟️', description: 'Access to all machines' },
 ]
 
 /**
  * Step 4 — Select available equipment (multi-select).
  *
- * Selecting "No Equipment" deselects everything else (and vice versa).
+ * "No Equipment" is mutually exclusive with everything else in both
+ * directions: picking it clears the rest, and picking anything else drops it.
  */
-export default function Step4Equipment({ data, onChange }) {
-  const selected = data.available_equipment || []
+export default function Step4Equipment({ data, onChange }: StepProps) {
+  const selected = data.available_equipment
 
-  const toggle = (value) => {
+  const toggle = (value: Equipment): void => {
     if (value === 'no_equipment') {
-      // Selecting "no equipment" clears all others
-      onChange({ available_equipment: selected.includes('no_equipment') ? [] : ['no_equipment'] })
+      onChange({
+        available_equipment: selected.includes('no_equipment') ? [] : ['no_equipment'],
+      })
       return
     }
 
-    // Any other selection removes "no_equipment" if present
-    let next
-    if (selected.includes(value)) {
-      next = selected.filter((v) => v !== value)
-    } else {
-      next = [...selected.filter((v) => v !== 'no_equipment'), value]
-    }
+    const next = selected.includes(value)
+      ? selected.filter((v) => v !== value)
+      : [...selected.filter((v) => v !== 'no_equipment'), value]
+
     onChange({ available_equipment: next })
   }
 
@@ -46,6 +55,9 @@ export default function Step4Equipment({ data, onChange }) {
           return (
             <button
               key={item.value}
+              type="button"
+              role="checkbox"
+              aria-checked={isSelected}
               onClick={() => toggle(item.value)}
               className={`
                 relative flex flex-col gap-1 px-3 py-3 rounded-xl border text-left
@@ -61,7 +73,7 @@ export default function Step4Equipment({ data, onChange }) {
                   <Check className="w-3 h-3" />
                 </span>
               )}
-              <span className="text-xl">{item.emoji}</span>
+              <span className="text-xl" aria-hidden="true">{item.emoji}</span>
               <span className={`text-sm font-medium ${isSelected ? 'text-white' : 'text-gray-300'}`}>
                 {item.label}
               </span>

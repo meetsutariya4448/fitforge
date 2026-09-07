@@ -1,4 +1,17 @@
-const LEVELS = [
+import type { FitnessLevel } from '../../../schemas/api'
+import type { StepProps } from '../types'
+
+interface LevelOption {
+  value: FitnessLevel
+  label: string
+  badge: string
+  description: string
+  color: string
+  borderColor: string
+  bgColor: string
+}
+
+const LEVELS: LevelOption[] = [
   {
     value: 'beginner',
     label: 'Beginner',
@@ -31,18 +44,21 @@ const LEVELS = [
 /**
  * Step 3 — Select fitness level.
  */
-export default function Step3Level({ data, onChange }) {
+export default function Step3Level({ data, onChange }: StepProps) {
   return (
     <div>
       <h2 className="text-2xl font-bold text-white mb-1">Your fitness level?</h2>
       <p className="text-gray-400 mb-6 text-sm">Be honest — the right intensity matters.</p>
 
-      <div className="space-y-3">
+      <div className="space-y-3" role="radiogroup" aria-label="Fitness level">
         {LEVELS.map((level) => {
           const isSelected = data.fitness_level === level.value
           return (
             <button
               key={level.value}
+              type="button"
+              role="radio"
+              aria-checked={isSelected}
               onClick={() => onChange({ fitness_level: level.value })}
               className={`
                 w-full flex items-start gap-4 px-4 py-4 rounded-xl border text-left

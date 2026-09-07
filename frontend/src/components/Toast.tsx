@@ -3,14 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { CheckCircle, XCircle, X } from 'lucide-react'
 
 /**
- * Toast notification component.
- *
- * @param {string}   message  - Text to display
- * @param {'success'|'error'} type - Controls colour scheme
- * @param {Function} onClose  - Called after auto-dismiss or manual close
+ * Toast notification component. Auto-dismisses after 3 seconds.
  */
-export default function Toast({ message, type = 'success', onClose }) {
-  // Auto-dismiss after 3 seconds
+export interface ToastProps {
+  message: string
+  type?: 'success' | 'error'
+  onClose: () => void
+}
+
+export default function Toast({ message, type = 'success', onClose }: ToastProps) {
   useEffect(() => {
     const timer = setTimeout(onClose, 3000)
     return () => clearTimeout(timer)
@@ -44,6 +45,7 @@ export default function Toast({ message, type = 'success', onClose }) {
         }
         <span>{message}</span>
         <button
+          type="button"
           onClick={onClose}
           className="ml-1 text-current opacity-50 hover:opacity-100 transition-opacity"
           aria-label="Dismiss"

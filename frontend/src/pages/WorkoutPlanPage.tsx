@@ -1,18 +1,38 @@
-import { useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { RefreshCw } from 'lucide-react'
 import { motion } from 'framer-motion'
-import WorkoutPlan from '../components/workout/WorkoutPlan'
+
 import Button from '../components/ui/Button'
 import LogWorkoutModal from '../components/LogWorkoutModal'
 import Navbar from '../components/Navbar'
+import WorkoutPlan from '../components/workout/WorkoutPlan'
+import {
+  workoutPlanSchema,
+  type WorkoutDay,
+  type WorkoutPlan as WorkoutPlanData,
+} from '../schemas/api'
+
+/**
+ * The plan arrives through router state, which survives a client-side
+ * navigation but not a refresh or a pasted link — and is user-controllable, so
+ * it is validated rather than trusted.
+ */
+function usePlanFromRouterState(): WorkoutPlanData | null {
+  const location = useLocation()
+  const raw = (location.state as { plan?: unknown } | null)?.plan
+  if (raw === undefined) return null
+
+  const parsed = workoutPlanSchema.safeParse(raw)
+  return parsed.success ? parsed.data : null
+}
 
 export default function WorkoutPlanPage() {
-  const location = useLocation()
   const navigate = useNavigate()
-  const plan = location.state?.plan
+  const plan = usePlanFromRouterState()
+
   const [modalOpen, setModalOpen] = useState(false)
-  const [selectedDay, setSelectedDay] = useState(null)
+  const [selectedDay, setSelectedDay] = useState<WorkoutDay | null>(null)
 
   useEffect(() => {
     document.title = 'FitForge — Your Plan'
@@ -41,7 +61,10 @@ export default function WorkoutPlanPage() {
       >
         <WorkoutPlan
           plan={plan}
-          onLogDay={(day) => { setSelectedDay(day); setModalOpen(true) }}
+          onLogDay={(day) => {
+            setSelectedDay(day)
+            setModalOpen(true)
+          }}
         />
       </motion.main>
 

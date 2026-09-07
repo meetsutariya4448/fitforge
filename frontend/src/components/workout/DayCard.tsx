@@ -1,20 +1,35 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, Clock, Dumbbell, ClipboardList } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+
 import Button from '../ui/Button'
+import type { Exercise, WorkoutDay } from '../../schemas/api'
 
 /**
  * Collapsible card for a single workout day.
  *
- * Shows day title and focus when collapsed; expands to reveal
- * all exercises, warmup/cooldown notes.
- *
- * @param {Object}   day         - WorkoutDay object from the API
- * @param {boolean}  defaultOpen - Whether to start expanded
- * @param {number}   index       - Used for staggered entrance animation
- * @param {Function} onLogDay    - Optional callback; if provided renders "Log This Workout" button
+ * Shows day title and focus when collapsed; expands to reveal all exercises and
+ * the warm-up / cool-down notes.
  */
-export default function DayCard({ day, defaultOpen = false, index = 0, grounded = true, onLogDay }) {
+export interface DayCardProps {
+  day: WorkoutDay
+  /** Whether to start expanded. */
+  defaultOpen?: boolean
+  /** Used for staggered entrance animation. */
+  index?: number
+  /** False when retrieval had low confidence — surfaces a caveat badge. */
+  grounded?: boolean
+  /** When provided, renders the "Log This Workout" button. */
+  onLogDay?: (day: WorkoutDay) => void
+}
+
+export default function DayCard({
+  day,
+  defaultOpen = false,
+  index = 0,
+  grounded = true,
+  onLogDay,
+}: DayCardProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
 
   return (
@@ -26,6 +41,7 @@ export default function DayCard({ day, defaultOpen = false, index = 0, grounded 
     >
       {/* ── Header (always visible, click to toggle) ── */}
       <button
+        type="button"
         onClick={() => setIsOpen((v) => !v)}
         className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-800/50 transition-colors"
         aria-expanded={isOpen}
@@ -131,7 +147,7 @@ export default function DayCard({ day, defaultOpen = false, index = 0, grounded 
 /**
  * A single row in the exercise list.
  */
-function ExerciseRow({ exercise, index }) {
+function ExerciseRow({ exercise, index }: { exercise: Exercise; index: number }) {
   return (
     <div className="flex items-start gap-3 px-3 py-3 rounded-xl bg-gray-800/40 hover:bg-gray-800/70 transition-colors">
       {/* Index number */}

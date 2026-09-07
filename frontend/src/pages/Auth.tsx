@@ -1,84 +1,91 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Dumbbell } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+
 import Button from '../components/ui/Button'
-import { register, login, getWorkoutHistory } from '../services/api'
+import { useAuth } from '../contexts/AuthContext'
+import { getWorkoutHistory, toApiError } from '../services/api'
 
 /**
  * Auth page — Login and Register in a single tabbed view.
  *
- * Register flow: submit form → POST /api/auth/register → save token → redirect /onboarding
- * Login flow:    submit form → POST /api/auth/login    → save token → redirect /onboarding
+ * Register flow: submit form → POST /api/auth/register → session stored → /onboarding
+ * Login flow:    submit form → POST /api/auth/login    → session stored → /plans or /onboarding
  */
+
+type Tab = 'login' | 'register'
+
+interface FormState {
+  name: string
+  email: string
+  password: string
+}
+
+const EMPTY_FORM: FormState = { name: '', email: '', password: '' }
+
+/** Where to land after signing in, honouring an interrupted navigation. */
+interface FromState {
+  from?: { pathname?: string }
+}
+
 export default function Auth() {
   const navigate = useNavigate()
-  useEffect(() => { document.title = 'FitForge — Sign In' }, [])
-  const [tab, setTab] = useState('login')       // 'login' | 'register'
+  const location = useLocation()
+  const { login, register } = useAuth()
+
+  useEffect(() => {
+    document.title = 'FitForge — Sign In'
+  }, [])
+
+  const [tab, setTab] = useState<Tab>('login')
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
+  const [form, setForm] = useState<FormState>(EMPTY_FORM)
 
-  // Shared form state — register uses all three, login uses email + password only
-  const [form, setForm] = useState({ name: '', email: '', password: '' })
-
-  const handleChange = (e) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+  const handleChange = (e: ChangeEvent<HTMLInputElement>): void => {
+    const { name, value } = e.target
+    setForm((prev) => ({ ...prev, [name]: value }))
     setError(null)
   }
 
-  const switchTab = (next) => {
+  const switchTab = (next: Tab): void => {
     setTab(next)
     setError(null)
-    setForm({ name: '', email: '', password: '' })
+    setForm(EMPTY_FORM)
   }
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
 
     try {
-      let response
-
       if (tab === 'register') {
-        // Register, then the response already includes the token
-        response = await register({
-          name: form.name,
-          email: form.email,
-          password: form.password,
-        })
-      } else {
-        // Login
-        response = await login({
-          email: form.email,
-          password: form.password,
-        })
-      }
-
-      // Save tokens and user info; refresh token enables silent re-auth
-      localStorage.setItem('fitforge_token', response.access_token)
-      if (response.refresh_token) {
-        localStorage.setItem('fitforge_refresh_token', response.refresh_token)
-      }
-      if (response.user) {
-        localStorage.setItem('fitforge_user', JSON.stringify(response.user))
-      }
-
-      if (tab === 'register') {
+        await register({ name: form.name, email: form.email, password: form.password })
         navigate('/onboarding')
-      } else {
-        // Returning user: send to plans if they have any, otherwise onboarding
-        const { total } = await getWorkoutHistory()
-        navigate(total > 0 ? '/plans' : '/onboarding')
+        return
       }
+
+      await login({ email: form.email, password: form.password })
+
+      // An interrupted navigation wins; otherwise returning users go to their
+      // plans and first-timers to onboarding.
+      const redirectTo = (location.state as FromState | null)?.from?.pathname
+      if (redirectTo && redirectTo !== '/auth') {
+        navigate(redirectTo, { replace: true })
+        return
+      }
+
+      const { total } = await getWorkoutHistory()
+      navigate(total > 0 ? '/plans' : '/onboarding')
     } catch (err) {
-      const detail = err.response?.data?.detail
-      // detail can be a string or a Pydantic validation array
-      if (Array.isArray(detail)) {
-        setError(detail.map((d) => d.msg).join(', '))
-      } else {
-        setError(detail || 'Something went wrong. Please try again.')
-      }
+      // toApiError normalises axios, network and schema failures into one shape
+      // with a message worth showing. The old code read `data.detail`, which the
+      // API's {"error": {code, message}} envelope never contained, so every
+      // server-supplied reason resolved to undefined and users saw only the
+      // generic fallback.
+      setError(toApiError(err).message)
     } finally {
       setIsLoading(false)
     }
@@ -87,13 +94,14 @@ export default function Auth() {
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center px-4 py-12">
       {/* Logo */}
-      <div
+      <button
+        type="button"
         className="flex items-center gap-2 mb-10 cursor-pointer"
         onClick={() => navigate('/')}
       >
         <Dumbbell className="w-6 h-6 text-brand-500" />
         <span className="text-xl font-bold text-white">FitForge</span>
-      </div>
+      </button>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -103,16 +111,14 @@ export default function Auth() {
       >
         {/* ── Tabs ── */}
         <div className="flex bg-gray-800 rounded-xl p-1 mb-8">
-          {['login', 'register'].map((t) => (
+          {(['login', 'register'] as const).map((t) => (
             <button
               key={t}
+              type="button"
               onClick={() => switchTab(t)}
               className={`
                 flex-1 py-2 rounded-lg text-sm font-semibold transition-all duration-150
-                ${tab === t
-                  ? 'bg-gray-950 text-white shadow'
-                  : 'text-gray-500 hover:text-gray-300'
-                }
+                ${tab === t ? 'bg-gray-950 text-white shadow' : 'text-gray-500 hover:text-gray-300'}
               `}
             >
               {t === 'login' ? 'Log In' : 'Register'}
@@ -124,6 +130,8 @@ export default function Auth() {
         <AnimatePresence>
           {error && (
             <motion.div
+              key="auth-error"
+              role="alert"
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
@@ -146,10 +154,11 @@ export default function Auth() {
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1.5">
                   Name
                 </label>
                 <input
+                  id="name"
                   name="name"
                   type="text"
                   value={form.name}
@@ -164,10 +173,11 @@ export default function Auth() {
           </AnimatePresence>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1.5">
               Email
             </label>
             <input
+              id="email"
               name="email"
               type="email"
               value={form.email}
@@ -180,10 +190,11 @@ export default function Auth() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1.5">
               Password
             </label>
             <input
+              id="password"
               name="password"
               type="password"
               value={form.password}
@@ -196,16 +207,8 @@ export default function Auth() {
             />
           </div>
 
-          <Button
-            type="submit"
-            size="md"
-            disabled={isLoading}
-            className="w-full mt-2"
-          >
-            {isLoading
-              ? 'Please wait…'
-              : tab === 'login' ? 'Log In' : 'Create Account'
-            }
+          <Button type="submit" size="md" disabled={isLoading} className="w-full mt-2">
+            {isLoading ? 'Please wait…' : tab === 'login' ? 'Log In' : 'Create Account'}
           </Button>
         </form>
 
@@ -213,6 +216,7 @@ export default function Auth() {
         <p className="text-center text-sm text-gray-500 mt-6">
           {tab === 'login' ? "Don't have an account? " : 'Already have an account? '}
           <button
+            type="button"
             onClick={() => switchTab(tab === 'login' ? 'register' : 'login')}
             className="text-brand-400 hover:text-brand-300 font-medium transition-colors"
           >

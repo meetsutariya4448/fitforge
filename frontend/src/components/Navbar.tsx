@@ -1,59 +1,61 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Dumbbell, BarChart2, LayoutList, LogIn, LogOut, UserCircle, Menu, X } from 'lucide-react'
+import {
+  Dumbbell,
+  BarChart2,
+  LayoutList,
+  LogIn,
+  LogOut,
+  UserCircle,
+  Menu,
+  X,
+} from 'lucide-react'
+
 import Button from './ui/Button'
+import { useAuth } from '../contexts/AuthContext'
 
 /**
  * Shared responsive navbar used on every page.
  *
- * Reads fitforge_token and fitforge_user from localStorage:
- *   - Logged in  → shows Dashboard, My Plans, user first name, Logout
- *   - Logged out → shows Login, Sign Up buttons
+ * Auth state comes from AuthContext rather than being read out of localStorage
+ * here. That matters for logout: the old version cleared storage and navigated,
+ * but every other mounted component kept rendering the stale user until the next
+ * full page load.
  *
  * Collapses to a hamburger menu on mobile (< md breakpoint).
  */
 export default function Navbar() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { user, isAuthenticated, logout } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
 
-  const token = localStorage.getItem('fitforge_token')
-  const isLoggedIn = !!token
-  const user = (() => {
-    try { return JSON.parse(localStorage.getItem('fitforge_user') || 'null') }
-    catch { return null }
-  })()
   const firstName = user?.name?.split(' ')[0] ?? 'Account'
 
-  const handleLogout = async () => {
-    const refreshToken = localStorage.getItem('fitforge_refresh_token')
-    localStorage.removeItem('fitforge_token')
-    localStorage.removeItem('fitforge_refresh_token')
-    localStorage.removeItem('fitforge_user')
+  const handleLogout = async (): Promise<void> => {
     setMenuOpen(false)
-    if (refreshToken) {
-      // Fire-and-forget: revoke server-side; don't block navigation on failure.
-      import('../services/api').then(({ default: apiClient }) => {
-        apiClient.post('/api/auth/logout', { refresh_token: refreshToken }).catch(() => {})
-      })
-    }
+    await logout()
     navigate('/')
   }
 
-  const isActive = (path) => location.pathname === path
+  const isActive = (path: string): boolean => location.pathname === path
 
-  const navLinkClass = (path) =>
+  const navLinkClass = (path: string): string =>
     `flex items-center gap-1.5 text-sm font-medium transition-colors px-1 py-0.5 ${
-      isActive(path)
-        ? 'text-brand-400'
-        : 'text-gray-400 hover:text-white'
+      isActive(path) ? 'text-brand-400' : 'text-gray-400 hover:text-white'
     }`
+
+  const go = (path: string): void => {
+    navigate(path)
+    setMenuOpen(false)
+  }
 
   return (
     <nav className="border-b border-gray-800 bg-gray-950/90 backdrop-blur-sm sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
         {/* Logo */}
         <button
+          type="button"
           onClick={() => navigate('/')}
           className="flex items-center gap-2 flex-shrink-0"
         >
@@ -63,12 +65,20 @@ export default function Navbar() {
 
         {/* Desktop nav */}
         <div className="hidden md:flex items-center gap-1">
-          {isLoggedIn ? (
+          {isAuthenticated ? (
             <>
-              <button onClick={() => navigate('/dashboard')} className={navLinkClass('/dashboard')}>
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard')}
+                className={navLinkClass('/dashboard')}
+              >
                 <BarChart2 className="w-4 h-4" /> Dashboard
               </button>
-              <button onClick={() => navigate('/plans')} className={navLinkClass('/plans')}>
+              <button
+                type="button"
+                onClick={() => navigate('/plans')}
+                className={navLinkClass('/plans')}
+              >
                 <LayoutList className="w-4 h-4" /> My Plans
               </button>
               <span className="mx-2 text-gray-700">|</span>
@@ -93,9 +103,11 @@ export default function Navbar() {
 
         {/* Mobile hamburger */}
         <button
+          type="button"
           className="md:hidden text-gray-400 hover:text-white transition-colors"
           onClick={() => setMenuOpen((v) => !v)}
           aria-label="Toggle menu"
+          aria-expanded={menuOpen}
         >
           {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
@@ -104,16 +116,18 @@ export default function Navbar() {
       {/* Mobile dropdown */}
       {menuOpen && (
         <div className="md:hidden border-t border-gray-800 px-6 py-4 space-y-3 bg-gray-950">
-          {isLoggedIn ? (
+          {isAuthenticated ? (
             <>
               <button
-                onClick={() => { navigate('/dashboard'); setMenuOpen(false) }}
+                type="button"
+                onClick={() => go('/dashboard')}
                 className={`${navLinkClass('/dashboard')} w-full text-left`}
               >
                 <BarChart2 className="w-4 h-4" /> Dashboard
               </button>
               <button
-                onClick={() => { navigate('/plans'); setMenuOpen(false) }}
+                type="button"
+                onClick={() => go('/plans')}
                 className={`${navLinkClass('/plans')} w-full text-left`}
               >
                 <LayoutList className="w-4 h-4" /> My Plans
@@ -129,10 +143,10 @@ export default function Navbar() {
             </>
           ) : (
             <div className="flex gap-3">
-              <Button variant="ghost" size="sm" onClick={() => { navigate('/auth'); setMenuOpen(false) }}>
+              <Button variant="ghost" size="sm" onClick={() => go('/auth')}>
                 <LogIn className="w-4 h-4 mr-1.5" /> Login
               </Button>
-              <Button size="sm" onClick={() => { navigate('/auth'); setMenuOpen(false) }}>
+              <Button size="sm" onClick={() => go('/auth')}>
                 Sign Up
               </Button>
             </div>

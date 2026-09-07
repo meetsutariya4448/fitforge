@@ -2,34 +2,46 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Brain, TrendingUp, Users, ArrowRight, Zap, Trophy } from 'lucide-react'
 import { motion } from 'framer-motion'
+import type { ReactNode } from 'react'
+
 import Button from '../components/ui/Button'
 import Navbar from '../components/Navbar'
-import { loginDemo } from '../services/api'
+import { useAuth } from '../contexts/AuthContext'
+import { toApiError } from '../services/api'
+
+interface Feature {
+  icon: ReactNode
+  title: string
+  description: string
+}
 
 export default function Home() {
   const navigate = useNavigate()
+  const { loginDemo } = useAuth()
   const [demoLoading, setDemoLoading] = useState(false)
-  const [demoError, setDemoError] = useState(null)
+  const [demoError, setDemoError] = useState<string | null>(null)
 
-  useEffect(() => { document.title = 'FitForge — AI Fitness Platform' }, [])
+  useEffect(() => {
+    document.title = 'FitForge — AI Fitness Platform'
+  }, [])
 
-  const handleDemo = async () => {
+  const handleDemo = async (): Promise<void> => {
     setDemoLoading(true)
     setDemoError(null)
     try {
-      const res = await loginDemo()
-      localStorage.setItem('fitforge_token', res.access_token)
-      if (res.refresh_token) localStorage.setItem('fitforge_refresh_token', res.refresh_token)
-      if (res.user) localStorage.setItem('fitforge_user', JSON.stringify(res.user))
+      // Goes through the auth context rather than writing localStorage here, so
+      // the navbar and route guards see the new session immediately instead of
+      // waiting for the next full page load.
+      await loginDemo()
       navigate('/dashboard')
-    } catch {
-      setDemoError('Demo login failed — try again')
+    } catch (err) {
+      setDemoError(toApiError(err).message)
     } finally {
       setDemoLoading(false)
     }
   }
 
-  const features = [
+  const features: Feature[] = [
     {
       icon: <Brain className="w-6 h-6" />,
       title: 'AI-Personalised Plans',
@@ -97,7 +109,9 @@ export default function Home() {
           </div>
 
           {demoError && (
-            <p className="mt-4 text-sm text-red-400">{demoError}</p>
+            <p role="alert" className="mt-4 text-sm text-red-400">
+              {demoError}
+            </p>
           )}
 
           <p className="mt-3 text-xs text-gray-600">
