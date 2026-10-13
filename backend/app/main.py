@@ -126,7 +126,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "error": {
                 "code": "VALIDATION_ERROR",
                 "message": "Request body is invalid.",
-                "details": exc.errors(),
+                # Pydantic model validators may put a ValueError in `ctx`;
+                # returning it directly makes the 422 handler itself fail JSON encoding.
+                "details": [{k: v for k, v in issue.items() if k != "ctx"} for issue in exc.errors()],
             }
         },
     )

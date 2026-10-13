@@ -29,7 +29,8 @@ export interface LogWorkoutModalProps {
 interface LogRow {
   exercise_name: string
   sets_completed: string
-  reps_completed: string
+  measure: 'reps' | 'duration'
+  measure_value: string
   weight_kg: string
 }
 
@@ -39,16 +40,22 @@ const DEFAULT_REPS = 10
 /**
  * Seed a row from a planned exercise.
  *
- * `reps` arrives as free text ("8-12", "30 seconds"), so the leading number is
- * used as the starting value and the user adjusts from there.
+ * `reps` arrives as free text ("8-12", "30 seconds"). Recognize explicit
+ * time units before reading the leading number, so a hold cannot become reps.
  */
 function toLogRow(exercise: Exercise): LogRow {
+  const planned = exercise.reps?.trim() ?? ''
+  const timed = planned.match(/\b(\d+)\s*(seconds?|secs?|s|minutes?|mins?)\b/i)
+  const durationSeconds = timed
+    ? Number(timed[1]) * (/^(minutes?|mins?)$/i.test(timed[2] ?? '') ? 60 : 1)
+    : null
   const leadingNumber = exercise.reps ? Number.parseInt(exercise.reps, 10) : Number.NaN
 
   return {
     exercise_name: exercise.name,
     sets_completed: String(exercise.sets ?? DEFAULT_SETS),
-    reps_completed: String(Number.isNaN(leadingNumber) ? DEFAULT_REPS : leadingNumber),
+    measure: durationSeconds === null ? 'reps' : 'duration',
+    measure_value: String(durationSeconds ?? (Number.isNaN(leadingNumber) ? DEFAULT_REPS : leadingNumber)),
     weight_kg: '',
   }
 }
@@ -90,8 +97,7 @@ export default function LogWorkoutModal({
   }
 
   const handleSave = async (): Promise<void> => {
-    // Validate before sending. An empty sets or reps field would otherwise reach
-    // the API as 0 — accepted, and silently recorded as a workout of nothing.
+    // Validate before sending. Never turn a duration into a repetition count.
     const candidate = {
       day_name: dayData?.day ?? 'Workout',
       plan_id: planId,
@@ -99,7 +105,10 @@ export default function LogWorkoutModal({
       exercise_logs: rows.map((row) => ({
         exercise_name: row.exercise_name,
         sets_completed: row.sets_completed === '' ? Number.NaN : Number(row.sets_completed),
-        reps_completed: row.reps_completed === '' ? Number.NaN : Number(row.reps_completed),
+        reps_completed: row.measure === 'reps'
+          ? (row.measure_value === '' ? Number.NaN : Number(row.measure_value)) : null,
+        duration_seconds: row.measure === 'duration'
+          ? (row.measure_value === '' ? Number.NaN : Number(row.measure_value)) : null,
         weight_kg: row.weight_kg === '' ? null : Number(row.weight_kg),
       })),
     }
@@ -111,8 +120,8 @@ export default function LogWorkoutModal({
       const exerciseName = rowIndex !== null ? rows[rowIndex]?.exercise_name : null
       setValidationError(
         exerciseName
-          ? `Check the numbers for ${exerciseName} — sets and reps are required.`
-          : 'Please fill in sets and reps for every exercise.',
+          ? `Check the numbers for ${exerciseName} — sets and ${rows[rowIndex!]?.measure === 'duration' ? 'seconds' : 'reps'} are required.`
+          : 'Please fill in sets and the exercise measure for every exercise.',
       )
       return
     }
@@ -189,13 +198,13 @@ export default function LogWorkoutModal({
                         />
                       </label>
                       <label className="block">
-                        <span className="text-xs text-gray-500 mb-1 block">Reps</span>
+                        <span className="text-xs text-gray-500 mb-1 block">{row.measure === 'duration' ? 'Seconds' : 'Reps'}</span>
                         <input
                           type="number"
                           min={1}
-                          value={row.reps_completed}
-                          onChange={(e) => updateRow(i, 'reps_completed', e.target.value)}
-                          aria-label={`Reps completed for ${row.exercise_name}`}
+                          value={row.measure_value}
+                          onChange={(e) => updateRow(i, 'measure_value', e.target.value)}
+                          aria-label={`${row.measure === 'duration' ? 'Seconds' : 'Reps'} completed for ${row.exercise_name}`}
                           className="input text-sm py-2"
                         />
                       </label>

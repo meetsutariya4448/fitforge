@@ -64,7 +64,7 @@ export default function Dashboard() {
 
   const totalVolume = sessions.reduce((sum, s) =>
     sum + s.exercise_logs.reduce((ls, l) =>
-      ls + l.sets_completed * l.reps_completed * (l.weight_kg || 0), 0), 0)
+      ls + l.sets_completed * (l.reps_completed ?? 0) * (l.weight_kg || 0), 0), 0)
 
   const exerciseCounts = {}
   sessions.forEach((s) =>
@@ -96,7 +96,7 @@ export default function Dashboard() {
       label: s.day_name.slice(0, 8),
       volume: Math.round(
         s.exercise_logs.reduce(
-          (sum, l) => sum + l.sets_completed * l.reps_completed * (l.weight_kg || 0), 0
+          (sum, l) => sum + l.sets_completed * (l.reps_completed ?? 0) * (l.weight_kg || 0), 0
         )
       ),
     }))
@@ -363,7 +363,7 @@ export default function Dashboard() {
                       </div>
                       <div className="flex items-center gap-3 flex-shrink-0 ml-3">
                         <span className="text-xs text-gray-400">
-                          {Math.round(s.exercise_logs.reduce((sum, l) => sum + l.sets_completed * l.reps_completed * (l.weight_kg || 0), 0)).toLocaleString()} kg
+                          {Math.round(s.exercise_logs.reduce((sum, l) => sum + l.sets_completed * (l.reps_completed ?? 0) * (l.weight_kg || 0), 0)).toLocaleString()} kg
                         </span>
                         {expandedSession === s.id
                           ? <ChevronUp className="w-4 h-4 text-gray-500" />
@@ -377,7 +377,7 @@ export default function Dashboard() {
                           <div key={i} className="flex items-center justify-between text-xs py-1">
                             <span className="text-gray-300">{l.exercise_name}</span>
                             <span className="text-gray-500">
-                              {l.sets_completed}×{l.reps_completed}{l.weight_kg ? ` @ ${l.weight_kg}kg` : ''}
+                              {l.sets_completed}×{l.duration_seconds == null ? `${l.reps_completed} reps` : `${l.duration_seconds} sec`}{l.weight_kg ? ` @ ${l.weight_kg}kg` : ''}
                             </span>
                           </div>
                         ))}

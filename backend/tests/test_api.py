@@ -324,6 +324,28 @@ class TestSessions:
         assert "id" in body
         assert len(body["exercise_logs"]) == 1
 
+    def test_timed_exercise_is_duration_not_reps(self, client):
+        token, _, _ = _register(client)
+        timed = {**_SESSION, "exercise_logs": [{
+            "exercise_name": "Plank", "sets_completed": 3,
+            "reps_completed": None, "duration_seconds": 30, "weight_kg": None,
+        }]}
+        result = client.post("/api/sessions", json=timed, headers=_auth(token))
+        assert result.status_code == 201, result.text
+        log = result.json()["exercise_logs"][0]
+        assert log["reps_completed"] is None
+        assert log["duration_seconds"] == 30
+        assert client.get("/api/prs", headers=_auth(token)).json() == []
+
+    def test_rejects_ambiguous_exercise_measure(self, client):
+        token, _, _ = _register(client)
+        both = {**_SESSION, "exercise_logs": [{
+            "exercise_name": "Plank", "sets_completed": 3,
+            "reps_completed": 30, "duration_seconds": 30,
+        }]}
+        result = client.post("/api/sessions", json=both, headers=_auth(token))
+        assert result.status_code == 422
+
     def test_first_log_creates_pr(self, client):
         token, _, _ = _register(client)
         client.post("/api/sessions", json=_SESSION, headers=_auth(token))

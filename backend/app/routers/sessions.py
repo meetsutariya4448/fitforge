@@ -60,6 +60,7 @@ def create_session(
             exercise_name=log.exercise_name,
             sets_completed=log.sets_completed,
             reps_completed=log.reps_completed,
+            duration_seconds=log.duration_seconds,
             weight_kg=log.weight_kg,
         ))
 
@@ -69,6 +70,9 @@ def create_session(
     # ── Upsert personal records ───────────────────────────────────────────────
     now = datetime.now(timezone.utc)
     for log in payload.exercise_logs:
+        # Duration is not a repetition count; do not create a reps/weight PR.
+        if log.duration_seconds is not None:
+            continue
         pr = (
             db.query(PersonalRecord)
             .filter(
@@ -166,7 +170,7 @@ def get_exercise_trend(
         ExerciseTrendPoint(
             date=session_date,
             max_weight_kg=log.weight_kg,
-            total_volume=log.sets_completed * log.reps_completed * (log.weight_kg or 0),
+            total_volume=log.sets_completed * (log.reps_completed or 0) * (log.weight_kg or 0),
         )
         for log, session_date in logs
     ]

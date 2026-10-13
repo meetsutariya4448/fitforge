@@ -2,7 +2,7 @@
 SQLAlchemy ORM models for workout session tracking.
 
 WorkoutSession — one logged training session (a specific day's workout)
-ExerciseLog    — one exercise entry within a session (sets/reps/weight)
+ExerciseLog    — one exercise entry within a session (sets/reps-or-duration/weight)
 
 Relationship: WorkoutSession has many ExerciseLogs (cascade delete).
 """
@@ -60,7 +60,7 @@ class ExerciseLog(Base):
     A single exercise entry within a workout session.
 
     Table: exercise_logs
-    Stores actual performance data: sets, reps, and optional weight.
+    Stores actual performance data: sets, either reps or duration, and optional weight.
     """
 
     __tablename__ = "exercise_logs"
@@ -77,7 +77,8 @@ class ExerciseLog(Base):
 
     exercise_name = Column(String, nullable=False)
     sets_completed = Column(Integer, nullable=False)
-    reps_completed = Column(Integer, nullable=False)
+    reps_completed = Column(Integer, nullable=True)
+    duration_seconds = Column(Integer, nullable=True)
     weight_kg = Column(Float, nullable=True)   # null = bodyweight exercise
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)

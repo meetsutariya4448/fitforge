@@ -9,7 +9,7 @@ WorkoutPlan     → the full weekly plan returned to the frontend
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional
 from enum import Enum
 
@@ -143,8 +143,19 @@ class ExerciseLogCreate(BaseModel):
     """One exercise entry submitted when logging a session."""
     exercise_name: str
     sets_completed: int
-    reps_completed: int
+    reps_completed: Optional[int] = None
+    duration_seconds: Optional[int] = None
     weight_kg: Optional[float] = None
+
+    @model_validator(mode="after")
+    def exactly_one_measure(self):
+        if (self.reps_completed is None) == (self.duration_seconds is None):
+            raise ValueError("Provide either reps_completed or duration_seconds")
+        if self.reps_completed is not None and self.reps_completed < 1:
+            raise ValueError("reps_completed must be positive")
+        if self.duration_seconds is not None and self.duration_seconds < 1:
+            raise ValueError("duration_seconds must be positive")
+        return self
 
 
 class SessionCreate(BaseModel):
@@ -160,7 +171,8 @@ class ExerciseLogResponse(BaseModel):
     id: int
     exercise_name: str
     sets_completed: int
-    reps_completed: int
+    reps_completed: Optional[int]
+    duration_seconds: Optional[int]
     weight_kg: Optional[float]
     created_at: datetime
 

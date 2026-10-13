@@ -54,11 +54,15 @@ describe('LogWorkoutModal', () => {
     expect(screen.getByLabelText('Sets completed for Bench Press')).toHaveValue(4)
     // "8-10" is free text; the leading number seeds the field.
     expect(screen.getByLabelText('Reps completed for Bench Press')).toHaveValue(8)
-    // Documents current behaviour rather than endorsing it: a duration like
-    // "30 seconds" also yields its leading number, so a 30-second hold is
-    // pre-filled as 30 reps. Pre-existing, and a candidate to put in front of a
-    // real user before deciding what it should do instead.
-    expect(screen.getByLabelText('Reps completed for Pull Up')).toHaveValue(30)
+    expect(screen.getByLabelText('Seconds completed for Pull Up')).toHaveValue(30)
+    expect(screen.queryByLabelText('Reps completed for Pull Up')).not.toBeInTheDocument()
+  })
+
+  it('recognizes time units even when the plan says hold for minutes', () => {
+    renderModal({ dayData: { ...DAY, exercises: [{
+      name: 'Wall Sit', sets: 2, reps: 'Hold for 2 minutes', rest_seconds: 60, notes: null,
+    }] } })
+    expect(screen.getByLabelText('Seconds completed for Wall Sit')).toHaveValue(120)
   })
 
   it('submits the edited values with the plan id', async () => {
@@ -80,6 +84,10 @@ describe('LogWorkoutModal', () => {
         ]),
       }),
     )
+    const payload = logWorkoutSession.mock.calls[0]![0]
+    expect(payload.exercise_logs[1]).toMatchObject({
+      exercise_name: 'Pull Up', reps_completed: null, duration_seconds: 30,
+    })
   })
 
   it('leaves weight null when it is not filled in', async () => {
@@ -105,6 +113,17 @@ describe('LogWorkoutModal', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/Bench Press/)
     // The request must not go out at all — this used to send sets_completed: 0.
+    expect(logWorkoutSession).not.toHaveBeenCalled()
+  })
+
+  it('refuses to save a timed exercise with missing seconds', async () => {
+    const user = userEvent.setup()
+    renderModal()
+
+    await user.clear(screen.getByLabelText('Seconds completed for Pull Up'))
+    await user.click(screen.getByRole('button', { name: 'Save Session' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Pull Up.*seconds/)
     expect(logWorkoutSession).not.toHaveBeenCalled()
   })
 

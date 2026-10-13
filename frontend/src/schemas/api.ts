@@ -174,9 +174,12 @@ export type WorkoutHistoryResponse = z.infer<typeof workoutHistoryResponseSchema
 
 export const exerciseLogCreateSchema = z.object({
   exercise_name: z.string().min(1),
-  sets_completed: z.number().int().nonnegative(),
-  reps_completed: z.number().int().nonnegative(),
+  sets_completed: z.number().int().positive(),
+  reps_completed: z.number().int().positive().nullable(),
+  duration_seconds: z.number().int().positive().nullable(),
   weight_kg: z.number().nonnegative().nullish(),
+}).refine((log) => (log.reps_completed === null) !== (log.duration_seconds === null), {
+  message: 'Provide reps or duration, not both',
 })
 
 export const sessionCreateSchema = z.object({
@@ -190,7 +193,8 @@ export const exerciseLogResponseSchema = z.object({
   id: z.number(),
   exercise_name: z.string(),
   sets_completed: z.number(),
-  reps_completed: z.number(),
+  reps_completed: z.number().nullable(),
+  duration_seconds: z.number().nullable(),
   // .nullable() not .nullish(): the API always sends this key, sometimes null.
   // Accepting its absence would let a removed field pass unnoticed.
   weight_kg: z.number().nullable(),

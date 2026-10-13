@@ -51,10 +51,29 @@ test('register, log a workout, see it in history and on the dashboard', async ({
   })
   expect(status).toBe(201)
 
+  const timedStatus = await page.evaluate(async () => {
+    const res = await fetch('/api/sessions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('fitforge_token')}`,
+      },
+      body: JSON.stringify({
+        day_name: 'Timed Day', plan_id: null, notes: 'duration unit check',
+        exercise_logs: [{ exercise_name: 'Plank', sets_completed: 3, reps_completed: null, duration_seconds: 30, weight_kg: null }],
+      }),
+    })
+    return res.status
+  })
+  expect(timedStatus).toBe(201)
+
   await page.goto('/dashboard')
   await expect(page.getByRole('heading', { name: 'Your Training Overview' })).toBeVisible()
   await expect(page.getByRole('alert')).toHaveCount(0)
   await expect(page.getByText('Squat').first()).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByText('Plank').first()).toBeVisible()
+  await page.getByText('Timed Day').click()
+  await expect(page.getByText('3×30 sec')).toBeVisible()
 
   expect(errors, `console/page errors: ${errors.join(' | ')}`).toEqual([])
 })
