@@ -65,6 +65,7 @@ export const SESSION = {
       exercise_name: 'Bench Press',
       sets_completed: 4,
       reps_completed: 8,
+      duration_seconds: null,
       weight_kg: 80,
       created_at: '2026-09-05T18:00:00Z',
     },
